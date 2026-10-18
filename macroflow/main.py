@@ -11,6 +11,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -258,6 +259,51 @@ def cmd_backtest(cfg, args, now):
         notify.Telegram().send(backtest.telegram_summary(summary, start, end))
 
 
+def cmd_test_telegram():
+    """Cek token & chat ID langkah demi langkah, tampilkan penyebab kalau gagal."""
+    import re
+
+    token = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
+    chat = (os.environ.get("TELEGRAM_CHAT_ID") or "").strip()
+    print(f"[1] Secret TELEGRAM_BOT_TOKEN: {'ADA' if token else 'KOSONG'}"
+          f" | TELEGRAM_CHAT_ID: {'ADA' if chat else 'KOSONG'}")
+    if not token or not chat:
+        print("GAGAL: secret belum diisi atau namanya tidak persis sama "
+              "(harus TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID).")
+        return False
+    if not re.fullmatch(r"\d+:[\w-]{30,}", token):
+        print("GAGAL: format token salah. Harus seperti 1234567890:AAH... "
+              "(tanpa spasi, tanpa tanda kutip, tanpa kata 'bot' di depan).")
+        return False
+    if not re.fullmatch(r"-?\d+", chat):
+        print("GAGAL: chat ID harus berupa angka saja, contoh 123456789 (grup: -100...).")
+        return False
+
+    base = f"https://api.telegram.org/bot{token}"
+    me = requests.get(f"{base}/getMe", timeout=30).json()
+    if not me.get("ok"):
+        print(f"[2] GAGAL cek token: {me.get('description')}")
+        print("    -> Token salah / sudah di-revoke. Isi ulang dengan token TERBARU dari @BotFather.")
+        return False
+    print(f"[2] Token valid. Nama bot: @{me['result']['username']}")
+
+    r = requests.post(f"{base}/sendMessage", timeout=30, json={
+        "chat_id": chat,
+        "text": "✅ MacroFlow Alert terhubung. Notifikasi sinyal akan dikirim ke sini."}).json()
+    if r.get("ok"):
+        print(f"[3] Terkirim ke chat {chat}. Cek chat dengan @{me['result']['username']} di Telegram.")
+        return True
+    desc = r.get("description", "")
+    print(f"[3] GAGAL kirim: {desc}")
+    if "chat not found" in desc:
+        print(f"    -> Chat ID salah, atau kamu belum menekan START di @{me['result']['username']}.")
+    elif "blocked" in desc:
+        print(f"    -> Kamu memblokir @{me['result']['username']}. Unblock lalu tekan START.")
+    elif "initiate" in desc or "Forbidden" in desc:
+        print(f"    -> Buka @{me['result']['username']} di Telegram dan tekan START dulu.")
+    return False
+
+
 def cmd_chat_id():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -302,9 +348,7 @@ def main():
     if args.cmd == "chat-id":
         return cmd_chat_id()
     if args.cmd == "test-telegram":
-        ok = notify.Telegram().send("✅ MacroFlow Alert terhubung. Notifikasi sinyal akan dikirim ke sini.")
-        print("Terkirim" if ok else "Gagal")
-        return
+        sys.exit(0 if cmd_test_telegram() else 1)
     modes = auto_modes(now) if args.cmd == "auto" else args.modes
     if not modes:
         log.info("Di luar jam jadwal (%s WIB) — tidak ada yang dijalankan", f"{now:%a %H:%M}")
