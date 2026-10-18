@@ -28,13 +28,24 @@ semuanya digabung jadi satu baris, misalnya `🔷COMBO + 📶STRONG`. Saham deng
 
 ## Status IHSG & peringatan keras
 
-Setiap notifikasi diawali **status IHSG**: arah (🟢 NAIK / 🔴 TURUN / 🟡 CAMPURAN), harga & % perubahan,
-posisi terhadap EMA50/EMA200, arah Illu Trx Daily (dan sejak kapan), serta Meter Daily & 1H.
+Setiap notifikasi diawali **status IHSG**:
+- arah (🟢 NAIK / 🔴 TURUN / 🟡 CAMPURAN) dari Illu Trx & Meter Daily, harga, % perubahan, posisi terhadap EMA50;
+- **rezim EMA200**: 🟢 UPTREND (harga di atas EMA200 yang naik), 🔴 DOWNTREND (di bawah EMA200 yang turun),
+  atau 🟡 TRANSISI. Dari chart IHSG 2025–2026: saat UPTREND sinyal SELL tunggal sering jebakan,
+  saat DOWNTREND sinyal BUY biasanya hanya pantulan;
+- jumlah sinyal SELL & BUY IHSG dalam 5 hari bursa terakhir.
 
-Kalau IHSG mendapat sinyal **STRONG SELL** (Meter berubah jadi STRONG SELL, dihitung di Daily dan 1H)
-**2 kali atau lebih dalam 5 hari bursa terakhir**, app mengirim **🚨 PERINGATAN KERAS** sebagai pesan
-tersendiri (sekali per hari) dan menampilkan banner peringatan di atas setiap notifikasi hari itu.
-Angka 2 dan 5 hari bisa diubah di `market_warning` pada `config.yaml`.
+**🚨 PERINGATAN KERAS** muncul bila IHSG mendapat sinyal SELL (COMBO, STANDAR, atau STRONG SELL) di
+**2 candle berbeda atau lebih dalam 5 hari bursa terakhir** (Daily & 1H dihitung). Peringatan dikirim sebagai
+pesan tersendiri (sekali per hari) dan banner di atas setiap notifikasi hari itu. Kalau ada ≥2 sinyal BUY
+saat UPTREND, status menampilkan **✅ Konfirmasi tren naik**. Semua angka bisa diubah di `market_warning`.
+
+### Menguji pola dengan data asli (`ihsg-study`)
+Actions → MacroFlow Alert → Run workflow → pilih **`ihsg-study`** (±2 menit). Ringkasan dikirim ke Telegram dan
+file Excel **ihsg-study** bisa diunduh di halaman run. Isinya: untuk setiap aturan (STRONG SELL ≥2, semua SELL ≥2/≥3,
+Daily saja, + DOWNTREND, BUY + UPTREND, dll.) berapa kali muncul dan apa yang terjadi pada IHSG 5/10/20 hari
+sesudahnya dibanding hari biasa, serta seberapa sering sinyal IHSG benar menurut rezim EMA200.
+Data: IHSG harian 10 tahun, 1 jam ±2 tahun (batas Yahoo).
 
 ## Jadwal (WIB, Senin–Jumat)
 
@@ -94,8 +105,8 @@ App ini sudah download per kelompok dan otomatis mencoba ulang.
   (default Rp 2 miliar). Naikkan kalau notifikasinya terlalu banyak.
 - `signals`: jenis sinyal per timeframe dan arah (`BUY` / `SELL`). Hapus yang tidak perlu. Bisa juga ditulis
   singkat untuk kedua arah, misalnya `1H: [COMBO, METER]`.
-- `market_warning`: indeks acuan untuk status pasar, jumlah hari bursa yang dilihat, dan berapa kali
-  STRONG SELL sampai muncul peringatan keras.
+- `market_warning`: indeks acuan, jumlah hari bursa yang dilihat (`window_days`), jumlah candle bersinyal SELL
+  untuk peringatan keras (`min_events`), jenis sinyal yang dihitung (`signals`), dan timeframe (`timeframes`).
 - `params`: parameter indikator, sama dengan input di Pine Script.
 
 ## Mencocokkan dengan TradingView
@@ -148,6 +159,7 @@ python -m macroflow.main auto                 # yang dipanggil jadwal (otomatis 
 python -m macroflow.main run daily-final      # paksa mode tertentu (hourly / daily-preclose / daily-final)
 python -m macroflow.main run hourly --dry-run # print ke layar, tidak kirim Telegram
 python -m macroflow.main test-telegram
+python -m macroflow.main ihsg-study           # uji pola IHSG, hasil ihsg_study.xlsx
 ```
 
 > Ini alat bantu notifikasi, bukan rekomendasi investasi. Tetap cek chart sebelum eksekusi.

@@ -32,12 +32,15 @@ signals:
     BUY:  [COMBO, METER]
     SELL: [ROYAL, COMBO, STANDAR, METER]
 
-# Status IHSG di atas setiap notifikasi + peringatan keras bila IHSG kena
-# sinyal STRONG SELL (METER) lebih dari 1x dalam beberapa hari bursa terakhir (Daily & 1H).
+# Status IHSG di atas setiap notifikasi (arah, rezim EMA200, Illu Trx, Meter) +
+# PERINGATAN KERAS bila IHSG mendapat sinyal SELL di beberapa candle berbeda dalam
+# beberapa hari bursa terakhir. Uji dulu dengan perintah `ihsg-study` di menu Run workflow.
 market_warning:
   index: IHSG
-  window_days: 5      # jumlah hari bursa yang dilihat
-  min_strong_sell: 2  # peringatan keras bila jumlah STRONG SELL >= angka ini
+  window_days: 5                    # jumlah hari bursa yang dilihat
+  min_events: 2                     # peringatan keras bila jumlah candle bersinyal SELL >= angka ini
+  signals: [COMBO, STANDAR, METER]  # jenis sinyal SELL yang dihitung (METER = STRONG SELL)
+  timeframes: [D, 1H]               # timeframe yang dihitung
 
 # Parameter indikator (sama dengan input Pine Script)
 params:

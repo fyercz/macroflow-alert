@@ -69,7 +69,7 @@ CFG = {
     "filter": {"min_avg_value": 1e8, "min_price": 50},
     "signals": {"D": ["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER"],
                 "1H": {"BUY": ["COMBO", "METER"], "SELL": ["ROYAL", "COMBO", "STANDAR", "METER"]}},
-    "market_warning": {"index": "IHSG", "window_days": 5, "min_strong_sell": 2},
+    "market_warning": {"index": "IHSG", "window_days": 5, "min_events": 2},
 }
 
 
@@ -273,13 +273,20 @@ def test_market_status_warning():
     now = pd.Timestamp("2026-10-16 16:20")
     h = make_crash_index()
     s = market.ihsg_status(daily_from_hourly(h), h, now, Params())
-    assert s.trend == "TURUN" and s.warning and len(s.events) >= 2
-    assert all(e[0] >= pd.Timestamp("2026-10-12") for e in s.events)
+    assert s.trend == "TURUN" and s.warning and len(s.sells) >= 2
+    assert all(e.time >= pd.Timestamp("2026-10-12") and e.side == "SELL" for e in s.sells)
+    assert len({(e.time, e.tf) for e in s.sells}) == len(s.sells)  # 1 kejadian per candle
+    assert s.regime in ("UPTREND", "DOWNTREND", "TRANSISI") and "Rezim:" in s.text()
+    only_meter = market.ihsg_status(daily_from_hourly(h), h, now, Params(), signals=("METER",))
+    assert all(e.names == ["METER"] for e in only_meter.sells)
+    assert len(only_meter.sells) <= len(s.sells)
+    d_only = market.ihsg_status(daily_from_hourly(h), h, now, Params(), timeframes=("D",))
+    assert all(e.tf == "D" for e in d_only.sells + d_only.buys)
     txt = s.text()
     assert "PERINGATAN KERAS" in txt and "STATUS IHSG" in txt
     calm = market.ihsg_status(DAILY["IHSG"], HOURLY["IHSG"], now, Params())
     assert calm is not None and "STATUS IHSG" in calm.text()
-    strict = market.ihsg_status(daily_from_hourly(h), h, now, Params(), min_strong_sell=99)
+    strict = market.ihsg_status(daily_from_hourly(h), h, now, Params(), min_events=99)
     assert not strict.warning and "PERINGATAN KERAS" not in strict.text()
 
 
@@ -302,6 +309,36 @@ def test_run_modes_ihsg_warning():
             assert not any(m.startswith("🚨") for m in tg2.sent)  # pesan khusus cukup 1x/hari
     finally:
         HOURLY["IHSG"], DAILY["IHSG"] = old_h, old_d
+
+
+def test_regime():
+    assert market.regime(110, 100, 95) == "UPTREND"
+    assert market.regime(90, 100, 105) == "DOWNTREND"
+    assert market.regime(90, 100, 95) == "TRANSISI"
+    assert market.regime(110, 100, 105) == "TRANSISI"
+
+
+def test_ihsg_study():
+    from macroflow import study
+    long_h = make_hourly(7, 6000, days=700)
+    long_d = daily_from_hourly(long_h)
+    old = data.download
+    data.download = lambda tickers, period, interval, **kw: (
+        {"IHSG": (long_d if interval == "1d" else long_h[long_h.index >= long_h.index[-6 * 250]]).copy()})
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "study.xlsx"
+            summary, reg = study.run(CFG, Params(), out, now=pd.Timestamp("2026-10-16 16:20"))
+            assert len(summary) >= 10 and summary["Episode"].sum() > 0
+            assert set(pd.ExcelFile(out).sheet_names) >= {"Aturan", "Sinyal per rezim", "Episode", "Harian"}
+            assert not reg.empty and set(reg["Arah sinyal"]) <= {"BUY", "SELL"}
+            harian = pd.read_excel(out, sheet_name="Harian")
+            # aturan dengan 1H hanya dinilai di periode yang punya data 1H
+            assert harian["Ada 1H"].sum() < len(harian)
+            txt = study.telegram_text(summary, reg)
+            assert "STUDI POLA IHSG" in txt and "episode" in txt
+    finally:
+        data.download = old
 
 
 if __name__ == "__main__":

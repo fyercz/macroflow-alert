@@ -28,9 +28,15 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 - **IHSG** (`^JKSE`, TradingView `IDX:COMPOSITE`) selalu dicek tanpa filter, tampil paling atas,
   **ROYAL (dan GOLDEN) dimatikan untuk IHSG** (volume indeks Yahoo tidak akurat). Diatur di `indices:` config.
 - **Status IHSG** di header setiap notifikasi (`macroflow/market.py`): NAIK/TURUN/CAMPURAN (Illu Trx D + Meter D),
-  harga, EMA50/200, Illu Trx D sejak kapan, Meter D & 1H. **Peringatan keras** (permintaan pengguna): bila IHSG kena
-  STRONG SELL (transisi Meter ke STRONG SELL, D **dan** 1H dihitung) ≥ 2× dalam 5 hari bursa terakhir → pesan
-  🚨 tersendiri 1×/hari (`state["done"]["warn|<tgl>"]`) + banner ringkas di setiap header. Config `market_warning`.
+  harga, EMA50, **rezim EMA200** (UPTREND = close>EMA200 & EMA200 naik 20 hari; DOWNTREND = kebalikan; selain itu
+  TRANSISI), Illu Trx D sejak kapan, Meter D & 1H, jumlah sinyal SELL/BUY IHSG dalam 5 hari.
+  **Peringatan keras** (permintaan pengguna, diperluas 19 Okt dari pola chart): IHSG punya sinyal SELL
+  (COMBO/STANDAR/METER, D **dan** 1H) di ≥2 **candle berbeda** dalam 5 hari bursa → pesan 🚨 tersendiri 1×/hari
+  (`state["done"]["warn|<tgl>"]`) + banner di setiap header. BUY ≥2 candle saat UPTREND → baris "✅ Konfirmasi tren naik".
+  Config `market_warning`: index, window_days, min_events (alias lama min_strong_sell), signals, timeframes.
+- Pengamatan pengguna dari chart IHSG (2 screenshot TradingView): sinyal searah EMA200 berhasil, melawan EMA200 gagal;
+  kumpulan 2–3 sinyal searah dalam beberapa hari mendahului pergerakan besar. **Belum terbukti dengan data** —
+  perintah `ihsg-study` dibuat untuk mengujinya (menunggu pengguna menjalankan & upload Excel).
 - **Money management**: jumlah lot / modal / risiko **DIHAPUS** atas permintaan pengguna,
   tetapi **SL, TP1, TP2 TETAP ADA** untuk sinyal BUY: SL = close − 2×ATR14, TP1 = 2R, TP2 = 3R,
   dibulatkan ke bawah sesuai fraksi harga BEI. Sinyal SELL menampilkan trailing stop Illu Trx.
@@ -46,8 +52,9 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 | `macroflow/signals.py` | Pembentukan H4 (09–13 & 13–17 WIB, pola TradingView IDX), D parsial, W; `meter()`; `evaluate()` → list `Signal`; `sl_tp()` |
 | `macroflow/data.py` | Daftar saham (TradingView scanner), download Yahoo per 80 ticker, `YAHOO_SYMBOLS` untuk indeks |
 | `macroflow/notify.py` | Format HTML Telegram, `merge_signals()` gabung sinyal ganda, split 3900 char, `TV_SYMBOLS` untuk indeks |
-| `macroflow/market.py` | `ihsg_status()` → `MarketStatus` (status IHSG + daftar STRONG SELL dalam N hari bursa, `.warning`, `.text()`, `.warning_text()`) |
-| `macroflow/main.py` | CLI: `auto`, `run <mode>`, `check TICKER --tf D/1H`, `backtest --start [--end] [--tf D 1H]` (tanggal divalidasi, exit 1 kalau salah), `test-telegram` (diagnostik 3 langkah, exit 1 kalau gagal), `chat-id` |
+| `macroflow/market.py` | `regime()`, `signal_events()` (1 Event per candle), `ihsg_status()` → `MarketStatus` (`.warning`, `.buy_confirm`, `.text()`, `.warning_text()`) |
+| `macroflow/study.py` | `ihsg-study`: per hari as-of close hitung kumpulan sinyal & rezim, ret 5/10/20h ke depan, episode, Excel 5 sheet + teks Telegram. IHSG D 10y, 1H 729d. Volume di-nol-kan → ROYAL tidak dihitung (cepat) |
+| `macroflow/main.py` | CLI: `auto`, `run <mode>`, `check TICKER --tf D/1H`, `backtest --start [--end] [--tf D 1H]` (tanggal divalidasi, exit 1 kalau salah), `ihsg-study [--telegram]`, `test-telegram` (diagnostik 3 langkah, exit 1 kalau gagal), `chat-id` |
 | `macroflow/backtest.py` | Putar ulang sinyal sejak tanggal X, simulasi SL/TP1/TP2, return 5/10 bar, Excel 4 sheet, ringkasan Telegram |
 | `config.yaml` | Semua setelan yang boleh diubah pengguna |
 | `tests/test_smoke.py` | Tes offline dengan data sintetis — **jalankan setiap habis mengubah kode** |
@@ -77,7 +84,7 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 ## Status terakhir (19 Okt 2026)
 
-- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (13 tes, ±40 detik, jalan tanpa pytest:
+- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (15 tes, ±30 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
 - Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:

@@ -2,3 +2,4 @@ state.json
 __pycache__/
 *.pyc
 backtest_hasil.xlsx
+ihsg_study.xlsx

@@ -227,6 +227,15 @@ def run_modes(modes, cfg, now, tg, state):
     state.save(today)
 
 
+def market_kwargs(mw):
+    """Setelan peringatan dari config `market_warning` (min_strong_sell = nama lama min_events)."""
+    return dict(
+        window_days=int(mw.get("window_days", 5)),
+        min_events=int(mw.get("min_events", mw.get("min_strong_sell", 2))),
+        signals=tuple(str(x).upper() for x in mw.get("signals", market.DEFAULT_SIGNALS)),
+        timeframes=tuple(str(x).upper() for x in mw.get("timeframes", ["D", "1H"])))
+
+
 def market_status(cfg, daily, hourly, today, now_naive, p):
     """Status indeks acuan (default IHSG) untuk header notifikasi. None kalau data tidak ada."""
     mw = cfg.get("market_warning") or {}
@@ -235,10 +244,8 @@ def market_status(cfg, daily, hourly, today, now_naive, p):
     if d is None or h is None:
         return None
     try:
-        return market.ihsg_status(
-            data.merge_today(d, h, today), h, now_naive, p, code=code,
-            window_days=int(mw.get("window_days", 5)),
-            min_strong_sell=int(mw.get("min_strong_sell", 2)))
+        return market.ihsg_status(data.merge_today(d, h, today), h, now_naive, p, code=code,
+                                  **market_kwargs(mw))
     except Exception as e:  # status hanya pelengkap, jangan gagalkan notifikasi
         log.warning("Status %s gagal dihitung: %s", code, e)
         return None
@@ -314,6 +321,22 @@ def cmd_backtest(cfg, args, now):
         start = pd.Timestamp(args.start)
         end = pd.Timestamp(args.end) if args.end else None
         notify.Telegram().send(backtest.telegram_summary(summary, start, end))
+
+
+def cmd_ihsg_study(cfg, args, now):
+    from . import study
+
+    setup_indices(cfg)
+    out = ROOT / args.out
+    summary, reg = study.run(cfg, params_from(cfg), out, now=pd.Timestamp(now.replace(tzinfo=None)))
+    with pd.option_context("display.width", 250, "display.max_columns", 30):
+        print(summary.round(1).to_string(index=False))
+        print()
+        print(reg.round(1).to_string(index=False))
+    print(f"\nDetail: {out}")
+    if args.telegram:
+        notify.Telegram().send_all(notify.split_messages(
+            "🔬 <b>STUDI POLA IHSG</b>", [study.telegram_text(summary, reg).split("\n", 1)[1]]))
 
 
 def cmd_test_telegram():
@@ -392,6 +415,9 @@ def main():
     b.add_argument("--tf", nargs="+", choices=["D", "1H"], default=["D", "1H"])
     b.add_argument("--out", default="backtest_hasil.xlsx")
     b.add_argument("--telegram", action="store_true", help="kirim ringkasan ke Telegram")
+    st = sub.add_parser("ihsg-study", help="uji pola sinyal IHSG (rezim EMA200, kumpulan sinyal)")
+    st.add_argument("--out", default="ihsg_study.xlsx")
+    st.add_argument("--telegram", action="store_true", help="kirim ringkasan ke Telegram")
     sub.add_parser("test-telegram")
     sub.add_parser("chat-id")
     args = ap.parse_args()
@@ -402,6 +428,8 @@ def main():
         return cmd_check(cfg, args.ticker, args.tf, args.bars)
     if args.cmd == "backtest":
         return cmd_backtest(cfg, args, now)
+    if args.cmd == "ihsg-study":
+        return cmd_ihsg_study(cfg, args, now)
     if args.cmd == "chat-id":
         return cmd_chat_id()
     if args.cmd == "test-telegram":

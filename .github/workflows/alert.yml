@@ -13,7 +13,7 @@ on:
         description: "Perintah"
         type: choice
         default: test-telegram
-        options: [test-telegram, backtest, auto, "run daily-final", "run daily-preclose", "run hourly"]
+        options: [test-telegram, backtest, ihsg-study, auto, "run daily-final", "run daily-preclose", "run hourly"]
       start:
         description: "Backtest: tanggal mulai (YYYY-MM-DD)"
         default: "2026-04-01"
@@ -71,6 +71,8 @@ jobs:
               1H) ARGS+=(--tf 1H) ;;
             esac
             python -m macroflow.main backtest "${ARGS[@]}"
+          elif [ "$CMD" = "ihsg-study" ]; then
+            python -m macroflow.main ihsg-study --telegram
           else
             python -m macroflow.main $CMD
           fi
@@ -81,6 +83,14 @@ jobs:
         with:
           name: backtest-hasil
           path: backtest_hasil.xlsx
+          if-no-files-found: warn
+
+      - name: Simpan hasil studi IHSG
+        if: github.event.inputs.command == 'ihsg-study'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ihsg-study
+          path: ihsg_study.xlsx
           if-no-files-found: warn
 
       - uses: actions/cache/save@v5
