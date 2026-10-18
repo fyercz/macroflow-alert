@@ -16,6 +16,26 @@ Sinyal dikirim ke Telegram dan dijalankan otomatis gratis di GitHub Actions.
 Setiap sinyal disertai harga, % perubahan, RSI, dan rasio volume. Sinyal BUY ditambah
 SL = close − 2×ATR14, TP1 = 2R, TP2 = 3R (dibulatkan ke fraksi harga BEI). Sinyal SELL ditambah level trailing stop Illu Trx.
 
+**Yang aktif saat ini** (berdasarkan backtest 1 Apr–30 Sep 2026, bisa diubah di `config.yaml`):
+
+| Timeframe | BUY | SELL |
+|---|---|---|
+| Daily | ROYAL, COMBO, STANDAR, METER | ROYAL, COMBO, STANDAR, METER |
+| 1H | COMBO, METER | ROYAL, COMBO, STANDAR, METER |
+
+GOLDEN dimatikan (hasil backtest paling jelek). Kalau satu saham mendapat beberapa sinyal di candle yang sama,
+semuanya digabung jadi satu baris, misalnya `🔷COMBO + 📶STRONG`. Saham dengan sinyal terbanyak tampil paling atas.
+
+## Status IHSG & peringatan keras
+
+Setiap notifikasi diawali **status IHSG**: arah (🟢 NAIK / 🔴 TURUN / 🟡 CAMPURAN), harga & % perubahan,
+posisi terhadap EMA50/EMA200, arah Illu Trx Daily (dan sejak kapan), serta Meter Daily & 1H.
+
+Kalau IHSG mendapat sinyal **STRONG SELL** (Meter berubah jadi STRONG SELL, dihitung di Daily dan 1H)
+**2 kali atau lebih dalam 5 hari bursa terakhir**, app mengirim **🚨 PERINGATAN KERAS** sebagai pesan
+tersendiri (sekali per hari) dan menampilkan banner peringatan di atas setiap notifikasi hari itu.
+Angka 2 dan 5 hari bisa diubah di `market_warning` pada `config.yaml`.
+
 ## Jadwal (WIB, Senin–Jumat)
 
 | Jam | Isi |
@@ -72,8 +92,10 @@ App ini sudah download per kelompok dan otomatis mencoba ulang.
   kecuali ROYAL (volume indeks di Yahoo tidak akurat). Cek riwayatnya: `python -m macroflow.main check IHSG`.
 - `filter.min_avg_value`: saham dengan rata-rata nilai transaksi 20 hari di bawah angka ini tidak dicek
   (default Rp 2 miliar). Naikkan kalau notifikasinya terlalu banyak.
-- `signals`: hapus jenis sinyal yang tidak perlu per timeframe. Misalnya kalau 1H terlalu ramai:
-  `1H: [COMBO, GOLDEN]`.
+- `signals`: jenis sinyal per timeframe dan arah (`BUY` / `SELL`). Hapus yang tidak perlu. Bisa juga ditulis
+  singkat untuk kedua arah, misalnya `1H: [COMBO, METER]`.
+- `market_warning`: indeks acuan untuk status pasar, jumlah hari bursa yang dilihat, dan berapa kali
+  STRONG SELL sampai muncul peringatan keras.
 - `params`: parameter indikator, sama dengan input di Pine Script.
 
 ## Mencocokkan dengan TradingView
@@ -102,13 +124,14 @@ Perbedaan kecil yang mungkin muncul:
 Putar ulang aplikasi untuk periode yang sudah lewat, lalu lihat hasil setiap sinyal.
 
 **Lewat GitHub (tanpa install apa-apa):** buka tab Actions → MacroFlow Alert → Run workflow. Pilih `backtest`,
-isi tanggal mulai (default `2026-09-01`), lalu jalankan. Prosesnya sekitar 10–20 menit. Ringkasan dikirim ke Telegram,
+isi tanggal mulai, tanggal akhir (kosongkan = sampai hari ini), dan timeframe (`D dan 1H`, `D`, atau `1H`),
+lalu jalankan. Untuk 6 bulan, `D` saja sekitar 5–10 menit; `D dan 1H` sekitar 30–60 menit. Ringkasan dikirim ke Telegram,
 dan file Excel lengkap bisa diunduh di halaman run tersebut (bagian **Artifacts → backtest-hasil**).
 
 **Lewat komputer:**
 ```bash
-python -m macroflow.main backtest --start 2026-09-01            # Daily + 1H
-python -m macroflow.main backtest --start 2026-09-01 --tf D     # Daily saja
+python -m macroflow.main backtest --start 2026-04-01 --end 2026-09-30   # Daily + 1H
+python -m macroflow.main backtest --start 2026-04-01 --tf D             # Daily saja
 ```
 
 Isi Excel:

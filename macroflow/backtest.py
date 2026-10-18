@@ -64,7 +64,8 @@ def simulate(chart, i, sig):
 
 
 def run(cfg, start, end=None, tfs=("D", "1H"), out=Path("backtest_hasil.xlsx"),
-        index_sigs=None, enabled=None, params=None, liquid=None, root=Path("."), now=None):
+        index_sigs=None, enabled=None, allowed=None, params=None, liquid=None, root=Path("."),
+        now=None):
     start = pd.Timestamp(start)
     end = pd.Timestamp(end) if end else None
     index_sigs = index_sigs or {}
@@ -100,8 +101,6 @@ def run(cfg, start, end=None, tfs=("D", "1H"), out=Path("backtest_hasil.xlsx"),
             if n_bt == 0:
                 continue
             allow = enabled(cfg, tf)
-            if t in index_sigs:
-                allow = allow & index_sigs[t]
             try:
                 last_i = int(np.where(sel)[0][-1])
                 sigs = evaluate(chart.iloc[:last_i + 1], d, h, tf, params, last_n=n_bt)
@@ -110,7 +109,7 @@ def run(cfg, start, end=None, tfs=("D", "1H"), out=Path("backtest_hasil.xlsx"),
                 continue
             pos = {ts: i for i, ts in enumerate(chart.index)}
             for s in sigs:
-                if s.name not in allow or s.bar_time < start:
+                if not allowed(s, t, allow, index_sigs) or s.bar_time < start:
                     continue
                 r = {"Waktu": s.bar_time, "Saham": t, "TF": tf, "Sinyal": s.name, "Arah": s.side,
                      "Close": s.close, "RSI": s.info.get("rsi"), "Vol x": s.info.get("vol_ratio")}

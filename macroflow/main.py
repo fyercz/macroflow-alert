@@ -21,7 +21,7 @@ import pandas as pd
 import requests
 import yaml
 
-from . import data, notify
+from . import data, market, notify
 from .signals import Params, evaluate
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -117,8 +117,28 @@ def market_open_today(hourly, today):
     return any((df.index >= today).any() for df in list(hourly.values())[:20])
 
 
+ALL_SIGNALS = ["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER"]
+
+
 def enabled(cfg, tf):
-    return set((cfg.get("signals") or {}).get(tf, ["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER"]))
+    """Set (nama, arah) sinyal yang aktif untuk timeframe `tf`.
+
+    config `signals.<tf>` boleh berupa list (berlaku BUY & SELL) atau
+    dict {BUY: [...], SELL: [...]}.
+    """
+    spec = (cfg.get("signals") or {}).get(tf, ALL_SIGNALS)
+    if isinstance(spec, dict):
+        sides = {side: spec.get(side) or [] for side in ("BUY", "SELL")}
+    else:
+        sides = {"BUY": spec or [], "SELL": spec or []}
+    return {(str(n).upper(), side) for side, names in sides.items() for n in names}
+
+
+def allowed(sig, ticker, allow, index_sigs):
+    """Apakah sinyal boleh dikirim (sesuai config timeframe & daftar sinyal indeks)."""
+    if (sig.name, sig.side) not in allow:
+        return False
+    return ticker not in index_sigs or sig.name in index_sigs[ticker]
 
 
 def run_modes(modes, cfg, now, tg, state):
@@ -132,6 +152,14 @@ def run_modes(modes, cfg, now, tg, state):
     day_str = today.strftime("%Y-%m-%d")
 
     done_days = state.d.setdefault("done", {})
+
+    # --- status IHSG + peringatan keras -------------------------------
+    status = market_status(cfg, daily, hourly, today, now_naive, p)
+    status_txt = ("\n\n" + status.text()) if status else ""
+    if status and status.warning and not done_days.get(f"warn|{day_str}"):
+        done_days[f"warn|{day_str}"] = True
+        tg.send_all([status.warning_text() + f"\n\n<i>{now:%d/%m %H:%M} WIB</i>"])
+
     for mode in modes:
         if mode != "hourly" and done_days.get(f"{mode}|{day_str}"):
             log.info("%s hari ini sudah dikirim — lewati", mode)
@@ -162,14 +190,13 @@ def run_modes(modes, cfg, now, tg, state):
                 log.warning("%s gagal dihitung: %s", t, e)
                 continue
             for s in sigs:
-                ok = s.name in (allow & index_sigs[t] if t in index_sigs else allow)
-                if ok and s.bar_time >= today:
+                if allowed(s, t, allow, index_sigs) and s.bar_time >= today:
                     found.append((t, s))
 
         if mode == "daily-preclose":
             state.d["preclose"][day_str] = [sig_key(t, "D", s) for t, s in found]
             header = (f"⏳ <b>SINYAL SEMENTARA — Daily</b>\n{now:%a %d %b %Y, %H:%M} WIB\n"
-                      "<i>Candle belum close, bisa berubah sampai penutupan.</i>")
+                      "<i>Candle belum close, bisa berubah sampai penutupan.</i>" + status_txt)
             msgs = notify.build_messages(header, found)
         elif mode == "daily-final":
             new = [(t, s) for t, s in found if not state.seen(sig_key(t, "D", s))]
@@ -182,7 +209,7 @@ def run_modes(modes, cfg, now, tg, state):
             if batal:
                 rows = [f"• {k.split('|')[0]} {k.split('|')[2]} {k.split('|')[3]}" for k in batal]
                 footer = "❌ <b>Sinyal sementara yang BATAL</b>\n" + "\n".join(rows)
-            header = f"✅ <b>SINYAL FINAL — Daily</b>\n{now:%a %d %b %Y} (setelah close)"
+            header = f"✅ <b>SINYAL FINAL — Daily</b>\n{now:%a %d %b %Y} (setelah close)" + status_txt
             msgs = notify.build_messages(header, new, footer)
             if not msgs and footer:
                 msgs = [header + "\n\nTidak ada sinyal baru.\n\n" + footer]
@@ -192,12 +219,29 @@ def run_modes(modes, cfg, now, tg, state):
                 state.mark(sig_key(t, "1H", s), day_str)
             bars = sorted({s.bar_time for _, s in new})
             when = ", ".join(f"{b:%H:%M}" for b in bars)
-            header = f"🕐 <b>SINYAL 1H</b> — candle {when}\n{now:%a %d %b %Y}"
-            msgs = notify.build_messages(header, new)
+            header = f"🕐 <b>SINYAL 1H</b> — candle {when}\n{now:%a %d %b %Y}" + status_txt
+            msgs = notify.build_messages(header, new, show_time=len(bars) > 1)
 
         log.info("%s: %d sinyal, %d pesan", mode, len(found), len(msgs))
         tg.send_all(msgs)
     state.save(today)
+
+
+def market_status(cfg, daily, hourly, today, now_naive, p):
+    """Status indeks acuan (default IHSG) untuk header notifikasi. None kalau data tidak ada."""
+    mw = cfg.get("market_warning") or {}
+    code = str(mw.get("index", "IHSG")).upper()
+    d, h = daily.get(code), hourly.get(code)
+    if d is None or h is None:
+        return None
+    try:
+        return market.ihsg_status(
+            data.merge_today(d, h, today), h, now_naive, p, code=code,
+            window_days=int(mw.get("window_days", 5)),
+            min_strong_sell=int(mw.get("min_strong_sell", 2)))
+    except Exception as e:  # status hanya pelengkap, jangan gagalkan notifikasi
+        log.warning("Status %s gagal dihitung: %s", code, e)
+        return None
 
 
 def auto_modes(now):
@@ -258,7 +302,7 @@ def cmd_backtest(cfg, args, now):
     out = ROOT / args.out
     df, summary = backtest.run(
         cfg, args.start, args.end, tuple(args.tf), out,
-        index_sigs=setup_indices(cfg), enabled=enabled, params=params_from(cfg),
+        index_sigs=setup_indices(cfg), enabled=enabled, allowed=allowed, params=params_from(cfg),
         liquid=liquid, root=ROOT, now=pd.Timestamp(now.replace(tzinfo=None)))
     if summary.empty:
         print("Tidak ada sinyal pada periode ini")

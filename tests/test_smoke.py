@@ -13,7 +13,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from macroflow import backtest, data, indicators as ta, main, notify  # noqa: E402
+from macroflow import backtest, data, indicators as ta, main, market, notify  # noqa: E402
 from macroflow.signals import Params, evaluate, h4_from_hourly, meter, sl_tp, tick_size  # noqa: E402
 
 WIB = ZoneInfo("Asia/Jakarta")
@@ -68,8 +68,23 @@ CFG = {
                          "signals": ["COMBO", "GOLDEN", "STANDAR", "METER"]}},
     "filter": {"min_avg_value": 1e8, "min_price": 50},
     "signals": {"D": ["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER"],
-                "1H": ["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER"]},
+                "1H": {"BUY": ["COMBO", "METER"], "SELL": ["ROYAL", "COMBO", "STANDAR", "METER"]}},
+    "market_warning": {"index": "IHSG", "window_days": 5, "min_strong_sell": 2},
 }
+
+
+def make_crash_index(seed=99, amp=0.05, drop=0.20, k=30):
+    """Indeks naik stabil lalu crash bergelombang di 5 hari terakhir (STRONG SELL berulang)."""
+    h = make_hourly(seed, 7000)
+    n = len(h)
+    rng = np.random.default_rng(1)
+    base = 7000 * np.exp(np.arange(n) * 0.0006 + rng.normal(0, 0.002, n).cumsum() * 0.2)
+    f = base / h["Close"].to_numpy()
+    seg = np.linspace(0, 1, k)
+    f[-k:] *= 1 - drop * seg + amp * np.sin(seg * 4 * np.pi)
+    for c in ("Open", "High", "Low", "Close"):
+        h[c] = h[c].to_numpy() * f
+    return h
 
 
 class FakeTelegram:
@@ -184,7 +199,8 @@ def test_backtest_excel():
         out = Path(tmp) / "bt.xlsx"
         df, summary = backtest.run(
             CFG, "2026-08-01", None, ("D", "1H"), out,
-            index_sigs=main.setup_indices(CFG), enabled=main.enabled, params=Params(),
+            index_sigs=main.setup_indices(CFG), enabled=main.enabled, allowed=main.allowed,
+            params=Params(),
             liquid=main.liquid, root=Path(tmp), now=pd.Timestamp(NOW.replace(tzinfo=None)))
         assert not df.empty and not summary.empty
         assert out.exists()
@@ -219,6 +235,73 @@ def test_cmd_backtest_end_tf():
                     assert e.code == 1
         finally:
             main.ROOT = old_root
+
+
+def test_enabled_config():
+    import yaml
+    cfg = yaml.safe_load((Path(main.ROOT) / "config.yaml").read_text())
+    d, h = main.enabled(cfg, "D"), main.enabled(cfg, "1H")
+    assert not any(n == "GOLDEN" for n, _ in d | h), "GOLDEN harus mati"
+    assert {n for n, side in h if side == "BUY"} == {"COMBO", "METER"}
+    assert ("ROYAL", "SELL") in h and ("ROYAL", "BUY") in d
+    assert main.enabled({"signals": {"D": ["COMBO"]}}, "D") == {("COMBO", "BUY"), ("COMBO", "SELL")}
+    from macroflow.signals import Signal
+    sig = Signal("STANDAR", "BUY", TODAY, 1.0)
+    assert not main.allowed(sig, "AAAA", h, {})
+    assert main.allowed(Signal("COMBO", "BUY", TODAY, 1.0), "AAAA", h, {})
+    assert not main.allowed(Signal("COMBO", "BUY", TODAY, 1.0), "IHSG", h, {"IHSG": {"METER"}})
+
+
+def test_merge_messages():
+    from macroflow.signals import Signal
+    notify.TV_SYMBOLS.clear()
+    info = {"chg": 1.0, "rsi": 60, "vol_ratio": 2.0, "sl": 950, "tp1": 1100, "tp2": 1150}
+    items = [("AAAA", Signal("METER", "BUY", TODAY, 1000.0, dict(info))),
+             ("AAAA", Signal("COMBO", "BUY", TODAY, 1000.0, dict(info))),
+             ("BBBB", Signal("STANDAR", "SELL", TODAY, 500.0, {"stop": 520})),
+             ("CCCC", Signal("COMBO", "BUY", TODAY, 800.0, dict(info)))]
+    msg = "\n".join(notify.build_messages("HDR", items))
+    assert msg.count(">AAAA<") == 1 and "🔷COMBO + 📶STRONG" in msg
+    assert "🟢 <b>BUY</b> — 2 saham" in msg and "🔴 <b>SELL</b> — 1 saham" in msg
+    assert msg.index(">AAAA<") < msg.index(">CCCC<")  # sinyal terbanyak di atas
+    long = [(f"T{i:03d}", Signal("COMBO", "BUY", TODAY, 1000.0, dict(info))) for i in range(150)]
+    msgs = notify.build_messages("JUDUL\nSTATUS PANJANG", long)
+    assert len(msgs) > 1 and msgs[1].startswith("JUDUL (lanjutan)") and "STATUS" not in msgs[1]
+
+
+def test_market_status_warning():
+    now = pd.Timestamp("2026-10-16 16:20")
+    h = make_crash_index()
+    s = market.ihsg_status(daily_from_hourly(h), h, now, Params())
+    assert s.trend == "TURUN" and s.warning and len(s.events) >= 2
+    assert all(e[0] >= pd.Timestamp("2026-10-12") for e in s.events)
+    txt = s.text()
+    assert "PERINGATAN KERAS" in txt and "STATUS IHSG" in txt
+    calm = market.ihsg_status(DAILY["IHSG"], HOURLY["IHSG"], now, Params())
+    assert calm is not None and "STATUS IHSG" in calm.text()
+    strict = market.ihsg_status(daily_from_hourly(h), h, now, Params(), min_strong_sell=99)
+    assert not strict.warning and "PERINGATAN KERAS" not in strict.text()
+
+
+def test_run_modes_ihsg_warning():
+    patch_data()
+    notify.TV_SYMBOLS.clear()
+    data.YAHOO_SYMBOLS.clear()
+    old_h, old_d = HOURLY["IHSG"], DAILY["IHSG"]
+    HOURLY["IHSG"] = make_crash_index()
+    DAILY["IHSG"] = daily_from_hourly(HOURLY["IHSG"])
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            state = main.State(Path(tmp) / "state.json")
+            tg = FakeTelegram()
+            main.run_modes(["hourly", "daily-final"], CFG, NOW, tg, state)
+            assert tg.sent[0].startswith("🚨🚨🚨 <b>PERINGATAN KERAS")
+            assert all("STATUS IHSG" in m for m in tg.sent[1:2])
+            tg2 = FakeTelegram()
+            main.run_modes(["hourly"], CFG, NOW, tg2, state)
+            assert not any(m.startswith("🚨") for m in tg2.sent)  # pesan khusus cukup 1x/hari
+    finally:
+        HOURLY["IHSG"], DAILY["IHSG"] = old_h, old_d
 
 
 if __name__ == "__main__":

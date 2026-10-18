@@ -13,17 +13,31 @@ indices:
   IHSG:
     yahoo: "^JKSE"
     tradingview: "IDX:COMPOSITE"
-    signals: [COMBO, GOLDEN, STANDAR, METER]
+    signals: [COMBO, STANDAR, METER]
 
 # Filter supaya saham tidak likuid tidak ikut dikirim
 filter:
   min_avg_value: 2000000000   # rata-rata nilai transaksi 20 hari (Rp). 2 M = 2 miliar
   min_price: 50               # harga minimum (Rp)
 
-# Sinyal yang dikirim per timeframe (hapus yang tidak perlu)
+# Sinyal yang dikirim per timeframe & arah (hapus yang tidak perlu).
+# Pilihan: ROYAL, COMBO, GOLDEN (khusus BUY), STANDAR, METER.
+# Bisa juga ditulis singkat untuk kedua arah, contoh:  D: [COMBO, METER]
+# Dasar pilihan saat ini: backtest 1 Apr–30 Sep 2026 (GOLDEN paling rugi; 1H BUY terbaik COMBO & METER).
 signals:
-  D:  [ROYAL, COMBO, GOLDEN, STANDAR, METER]
-  1H: [ROYAL, COMBO, GOLDEN, STANDAR, METER]
+  D:
+    BUY:  [ROYAL, COMBO, STANDAR, METER]
+    SELL: [ROYAL, COMBO, STANDAR, METER]
+  1H:
+    BUY:  [COMBO, METER]
+    SELL: [ROYAL, COMBO, STANDAR, METER]
+
+# Status IHSG di atas setiap notifikasi + peringatan keras bila IHSG kena
+# sinyal STRONG SELL (METER) lebih dari 1x dalam beberapa hari bursa terakhir (Daily & 1H).
+market_warning:
+  index: IHSG
+  window_days: 5      # jumlah hari bursa yang dilihat
+  min_strong_sell: 2  # peringatan keras bila jumlah STRONG SELL >= angka ini
 
 # Parameter indikator (sama dengan input Pine Script)
 params:

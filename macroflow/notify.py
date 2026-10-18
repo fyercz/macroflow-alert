@@ -16,6 +16,10 @@ TITLE = {
     "STANDAR": "📍 STANDAR (Illu Trx)",
     "METER": "📶 METER STRONG",
 }
+SHORT = {"ROYAL": "👑ROYAL", "COMBO": "🔷COMBO", "GOLDEN": "🌟GOLDEN",
+         "STANDAR": "📍STANDAR", "METER": "📶STRONG"}
+LEGEND = ("<i>👑ROYAL=H4+D+W+Vol · 🔷COMBO=Illu+EMA50+MACD+RSI · 📍STANDAR=Illu Trx · "
+          "📶STRONG=Meter STRONG · 🌟GOLDEN=MA200+Stoch</i>")
 
 
 def fmt_price(x):
@@ -50,45 +54,78 @@ def fmt_signal_line(ticker, s, prefix=""):
     return line
 
 
-def build_messages(header, items, footer=""):
-    """items: list (ticker, Signal). Kelompokkan per jenis & sisi."""
+def merge_signals(items):
+    """Gabung sinyal ganda: satu entri per (saham, arah, candle).
+
+    Return list (ticker, side, bar_time, [Signal...]) — sinyal diurutkan sesuai ORDER.
+    """
+    groups = {}
+    for t, s in items:
+        groups.setdefault((t, s.side, s.bar_time), []).append(s)
+    out = []
+    for (t, side, bt), sigs in groups.items():
+        sigs = sorted({s.name: s for s in sigs}.values(), key=lambda s: ORDER.index(s.name))
+        out.append((t, side, bt, sigs))
+    return out
+
+
+def _merged_line(ticker, sigs, show_time=False):
+    names = " + ".join(SHORT[s.name] for s in sigs)
+    when = f" · {sigs[0].bar_time:%H:%M}" if show_time else ""
+    # baris harga/SL memakai sinyal pertama (semua sinyal di candle yang sama)
+    return fmt_signal_line(ticker, sigs[0]).replace("\n", f" · <b>{names}</b>{when}\n", 1)
+
+
+def build_messages(header, items, footer="", show_time=False):
+    """items: list (ticker, Signal). Satu baris per saham per candle, dikelompokkan per arah.
+
+    Urutan: saham dengan sinyal terbanyak dulu, lalu sinyal terkuat (ROYAL > COMBO > ...),
+    lalu rasio volume tertinggi.
+    """
+    merged = merge_signals(items)
     blocks = []
     # indeks (mis. IHSG) selalu paling atas
     for idx in TV_SYMBOLS:
-        rows = [s for t, s in items if t == idx]
+        rows = [m for m in merged if m[0] == idx]
         if rows:
-            lines = [f"📊 <b>{esc(idx)}</b>"]
-            for s in sorted(rows, key=lambda s: (s.side != "BUY", ORDER.index(s.name))):
-                emoji = "🟢" if s.side == "BUY" else "🔴"
-                lines.append(fmt_signal_line(idx, s, f"{emoji} {s.name} {s.side} · "))
+            lines = [f"📊 <b>Sinyal {esc(idx)}</b>"]
+            for t, side, bt, sigs in sorted(rows, key=lambda m: (m[1] != "BUY", m[2])):
+                emoji = "🟢" if side == "BUY" else "🔴"
+                lines.append(f"{emoji} {side} · " + _merged_line(t, sigs, show_time))
             blocks.append("\n".join(lines))
-    items = [(t, s) for t, s in items if t not in TV_SYMBOLS]
+    merged = [m for m in merged if m[0] not in TV_SYMBOLS]
+
+    def key(m):
+        sigs = m[3]
+        return (-len(sigs), ORDER.index(sigs[0].name), -(sigs[0].info.get("vol_ratio") or 0), m[0])
+
     for side, emoji in (("BUY", "🟢"), ("SELL", "🔴")):
-        for name in ORDER:
-            rows = [(t, s) for t, s in items if s.name == name and s.side == side]
-            if not rows:
-                continue
-            rows.sort(key=lambda r: -(r[1].info.get("vol_ratio") or 0))
-            lines = [f"{emoji} <b>{TITLE[name]} — {side}</b> ({len(rows)})"]
-            lines += [fmt_signal_line(t, s) for t, s in rows]
-            blocks.append("\n".join(lines))
+        rows = sorted((m for m in merged if m[1] == side), key=key)
+        if not rows:
+            continue
+        lines = [f"{emoji} <b>{side}</b> — {len({m[0] for m in rows})} saham"]
+        lines += [_merged_line(t, sigs, show_time) for t, _, _, sigs in rows]
+        blocks.append("\n".join(lines))
     if not blocks:
         return []
+    blocks.append(LEGEND)
     return split_messages(header, blocks, footer)
 
 
 def split_messages(header, blocks, footer="", limit=3900):
+    # pesan lanjutan cukup memakai baris pertama header (tanpa blok status)
+    cont = header.split("\n")[0] + " (lanjutan)"
     msgs, cur = [], header
     for b in blocks:
-        for piece in _split_block(b, limit - len(header) - 10):
+        for piece in _split_block(b, limit - len(cont) - 10):
             if len(cur) + len(piece) + 2 > limit:
                 msgs.append(cur)
-                cur = header + " (lanjutan)"
+                cur = cont
             cur += "\n\n" + piece
     if footer:
         if len(cur) + len(footer) + 2 > limit:
             msgs.append(cur)
-            cur = header + " (lanjutan)"
+            cur = cont
         cur += "\n\n" + footer
     msgs.append(cur)
     return msgs
