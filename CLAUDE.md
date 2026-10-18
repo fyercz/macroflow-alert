@@ -77,8 +77,17 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 - Menu Run workflow sekarang punya input backtest `start` (default 2026-04-01), `end` (kosong = hari ini),
   `tf` (D dan 1H / D / 1H); input dilewatkan via env (aman dari injeksi). Timeout job backtest 180 menit
   (lainnya 50). Estimasi: ±6 detik/saham untuk 6 bulan D+1H (1H dominan) → ±30–60 menit untuk ~314 saham.
-- Menunggu: pengguna backtest ulang periode normal (usul Apr–Sep 2026). Usulan belum dikerjakan:
-  filter pasar (tahan BUY saat meter IHSG SELL), gabung sinyal ganda per saham per candle.
+- Backtest kedua **1 Apr–30 Sep 2026** (295 saham; 9.666 sinyal D ≈ 80/hari, 65.904 sinyal 1H ≈ 545/hari).
+  Analisis (biaya 0,4% PP, 1 trade per saham/candle, R = jarak SL; median SL D ±10–15%, 1H ±3,8%):
+  * BUY secara keseluruhan ≈ impas: D −0,06R, 1H 0,00R (exit TP1). Hit TP1 ±33–39% ≈ acak untuk 2R:1R.
+  * Hasil didominasi kondisi pasar: Jun–Agu bagus (+0,2…+0,6R), Apr–Mei & Sep jelek (−0,3…−0,8R).
+  * Terbaik (tipis): 1H COMBO/METER +0,05R (TP1) / +0,11R (TP2); D RSI>60 & Vol>3x +0,11R (±3/hari, rawan overfit).
+  * Terburuk: GOLDEN D −0,37R net; BUY dengan RSI<50 jelek. ROYAL tidak lebih baik dari yang lain.
+  * SELL D COMBO benar 57% (5 bar), 60% bila IHSG Illu Trx SELL → berguna sebagai peringatan.
+  * Filter IHSG (Illu Trx) & breadth: membantu sedikit di D (−0,14 → +0,03R), tidak membantu di 1H.
+  Script analisis tidak disimpan di repo (dibuat ulang dari Excel bila perlu).
+- Usulan ke pengguna (menunggu keputusan): matikan GOLDEN; 1H BUY hanya COMBO+METER (atau matikan 1H BUY);
+  gabung sinyal ganda per saham per candle; tampilkan status IHSG di header; perlakukan sinyal sebagai watchlist.
 
 ## Ide lanjutan yang pernah ditawarkan (belum dikerjakan)
 
