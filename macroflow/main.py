@@ -242,6 +242,19 @@ def cmd_check(cfg, ticker, tf, bars):
 def cmd_backtest(cfg, args, now):
     from . import backtest
 
+    try:
+        start = pd.Timestamp(args.start.strip())
+        end = pd.Timestamp(args.end.strip()) if args.end and args.end.strip() else None
+    except ValueError:
+        print("GAGAL: format tanggal salah. Pakai YYYY-MM-DD, contoh 2026-04-01.")
+        sys.exit(1)
+    if end is not None and end < start:
+        print("GAGAL: tanggal akhir lebih awal dari tanggal mulai.")
+        sys.exit(1)
+    args.start = f"{start:%Y-%m-%d}"
+    args.end = f"{end:%Y-%m-%d}" if end is not None else None
+    print(f"Backtest {args.start} s/d {args.end or 'hari ini'}, timeframe {' & '.join(args.tf)}")
+
     out = ROOT / args.out
     df, summary = backtest.run(
         cfg, args.start, args.end, tuple(args.tf), out,

@@ -37,7 +37,7 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 | `macroflow/signals.py` | Pembentukan H4 (09–13 & 13–17 WIB, pola TradingView IDX), D parsial, W; `meter()`; `evaluate()` → list `Signal`; `sl_tp()` |
 | `macroflow/data.py` | Daftar saham (TradingView scanner), download Yahoo per 80 ticker, `YAHOO_SYMBOLS` untuk indeks |
 | `macroflow/notify.py` | Format HTML Telegram, split 3900 char, `TV_SYMBOLS` untuk indeks |
-| `macroflow/main.py` | CLI: `auto`, `run <mode>`, `check TICKER --tf D/1H`, `backtest --start`, `test-telegram` (diagnostik 3 langkah, exit 1 kalau gagal), `chat-id` |
+| `macroflow/main.py` | CLI: `auto`, `run <mode>`, `check TICKER --tf D/1H`, `backtest --start [--end] [--tf D 1H]` (tanggal divalidasi, exit 1 kalau salah), `test-telegram` (diagnostik 3 langkah, exit 1 kalau gagal), `chat-id` |
 | `macroflow/backtest.py` | Putar ulang sinyal sejak tanggal X, simulasi SL/TP1/TP2, return 5/10 bar, Excel 4 sheet, ringkasan Telegram |
 | `config.yaml` | Semua setelan yang boleh diubah pengguna |
 | `tests/test_smoke.py` | Tes offline dengan data sintetis — **jalankan setiap habis mengubah kode** |
@@ -67,20 +67,22 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 ## Status terakhir (19 Okt 2026)
 
-- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (8 tes, ±20 detik, jalan tanpa pytest:
+- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (9 tes, ±25 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
 - Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:
   periode itu crash IHSG (16 Okt −11,57% ke 5.185, trading halt, isu MSCI). Hasil: 477 sinyal D + 1.818 sinyal 1H
   dalam 3 hari (terlalu ramai, sering 2–4 sinyal di candle yg sama); hampir semua BUY kena SL (win rate 0–11%),
-  SELL 1H benar 54–67%. Daily belum punya data 5 bar. Usulan ke pengguna (belum dikerjakan):
-  backtest periode normal lebih panjang (mis. Apr–Sep 2026), tambah input `end` & `tf` di workflow,
+  SELL 1H benar 54–67%. Daily belum punya data 5 bar.
+- Menu Run workflow sekarang punya input backtest `start` (default 2026-04-01), `end` (kosong = hari ini),
+  `tf` (D dan 1H / D / 1H); input dilewatkan via env (aman dari injeksi). Timeout job backtest 180 menit
+  (lainnya 50). Estimasi: ±6 detik/saham untuk 6 bulan D+1H (1H dominan) → ±30–60 menit untuk ~314 saham.
+- Menunggu: pengguna backtest ulang periode normal (usul Apr–Sep 2026). Usulan belum dikerjakan:
   filter pasar (tahan BUY saat meter IHSG SELL), gabung sinyal ganda per saham per candle.
 
 ## Ide lanjutan yang pernah ditawarkan (belum dikerjakan)
 
 - Input tanggal backtest `5d` = 5 hari bursa terakhir otomatis.
-- Opsi backtest Daily saja (`--tf D`) di menu workflow untuk periode panjang.
 - Kurangi kebisingan ROYAL/METER di 1H (mis. cooldown, atau hapus dari `signals.1H`) setelah lihat hasil backtest.
 - Ganti sumber data (EODHD $29.99/bln intraday — cek dulu dukungan `.JK` 1h; Invezgo lokal) bila Yahoo bermasalah;
   cukup ganti `data.download()`.

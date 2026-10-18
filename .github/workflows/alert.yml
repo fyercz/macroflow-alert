@@ -15,8 +15,16 @@ on:
         default: test-telegram
         options: [test-telegram, backtest, auto, "run daily-final", "run daily-preclose", "run hourly"]
       start:
-        description: "Tanggal mulai backtest (YYYY-MM-DD)"
-        default: "2026-09-01"
+        description: "Backtest: tanggal mulai (YYYY-MM-DD)"
+        default: "2026-04-01"
+      end:
+        description: "Backtest: tanggal akhir (YYYY-MM-DD, kosongkan = sampai hari ini)"
+        default: ""
+      tf:
+        description: "Backtest: timeframe (D saja jauh lebih cepat)"
+        type: choice
+        default: "D dan 1H"
+        options: ["D dan 1H", "D", "1H"]
 
 concurrency:
   group: macroflow
@@ -25,7 +33,8 @@ concurrency:
 jobs:
   alert:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    # backtest periode panjang butuh waktu lebih lama
+    timeout-minutes: ${{ github.event.inputs.command == 'backtest' && 180 || 50 }}
     steps:
       - uses: actions/checkout@v5
 
@@ -49,10 +58,19 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CMD: ${{ github.event.inputs.command || 'auto' }}
+          BT_START: ${{ github.event.inputs.start }}
+          BT_END: ${{ github.event.inputs.end }}
+          BT_TF: ${{ github.event.inputs.tf }}
         run: |
-          CMD="${{ github.event.inputs.command || 'auto' }}"
           if [ "$CMD" = "backtest" ]; then
-            python -m macroflow.main backtest --start "${{ github.event.inputs.start }}" --telegram
+            ARGS=(--start "$BT_START" --telegram)
+            [ -n "$BT_END" ] && ARGS+=(--end "$BT_END")
+            case "$BT_TF" in
+              D) ARGS+=(--tf D) ;;
+              1H) ARGS+=(--tf 1H) ;;
+            esac
+            python -m macroflow.main backtest "${ARGS[@]}"
           else
             python -m macroflow.main $CMD
           fi

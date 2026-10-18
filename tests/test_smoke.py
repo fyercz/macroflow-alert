@@ -194,6 +194,33 @@ def test_backtest_excel():
         assert "BACKTEST" in txt
 
 
+def test_cmd_backtest_end_tf():
+    import argparse
+    patch_data()
+    data.YAHOO_SYMBOLS.clear()
+    old_root = main.ROOT
+    with tempfile.TemporaryDirectory() as tmp:
+        main.ROOT = Path(tmp)
+        try:
+            args = argparse.Namespace(start=" 2026-08-01", end="2026-09-15", tf=["D"],
+                                      out="bt.xlsx", telegram=False)
+            main.cmd_backtest(CFG, args, NOW)
+            d = pd.read_excel(Path(tmp) / "bt.xlsx", sheet_name=None)
+            assert "Sinyal 1H" not in d and "Sinyal Daily" in d
+            w = pd.to_datetime(d["Sinyal Daily"]["Waktu"])
+            assert w.min() >= pd.Timestamp("2026-08-01") and w.max() <= pd.Timestamp("2026-09-15")
+            for bad in (("2026-13-01", None), ("2026-09-01", "2026-08-01")):
+                args = argparse.Namespace(start=bad[0], end=bad[1], tf=["D"], out="x.xlsx",
+                                          telegram=False)
+                try:
+                    main.cmd_backtest(CFG, args, NOW)
+                    raise AssertionError("tanggal salah seharusnya ditolak")
+                except SystemExit as e:
+                    assert e.code == 1
+        finally:
+            main.ROOT = old_root
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in dict(globals()).items() if n.startswith("test_") and callable(f)]
     failed = 0
