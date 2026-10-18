@@ -27,9 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -37,7 +37,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       # state.json (anti dobel notifikasi) & tickers.txt disimpan antar-run
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v5
         with:
           path: |
             state.json
@@ -59,13 +59,13 @@ jobs:
 
       - name: Simpan hasil backtest
         if: github.event.inputs.command == 'backtest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: backtest-hasil
           path: backtest_hasil.xlsx
           if-no-files-found: warn
 
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v5
         if: always()
         with:
           path: |
