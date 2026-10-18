@@ -1,0 +1,74 @@
+name: MacroFlow Alert
+
+on:
+  schedule:
+    # Jam dalam UTC (WIB - 7). Senin-Jumat.
+    # 10:15 11:15 12:15 14:15 15:15 16:15 WIB -> sinyal 1H (16:15 juga Daily FINAL)
+    - cron: "15 3,4,5,7,8,9 * * 1-5"
+    # 14:45 WIB -> sinyal Daily SEMENTARA (sebelum pre-closing)
+    - cron: "45 7 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Perintah"
+        type: choice
+        default: test-telegram
+        options: [test-telegram, backtest, auto, "run daily-final", "run daily-preclose", "run hourly"]
+      start:
+        description: "Tanggal mulai backtest (YYYY-MM-DD)"
+        default: "2026-09-01"
+
+concurrency:
+  group: macroflow
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # state.json (anti dobel notifikasi) & tickers.txt disimpan antar-run
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            state.json
+            tickers.txt
+          key: macroflow-state-${{ github.run_id }}
+          restore-keys: macroflow-state-
+
+      - name: Jalankan
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          CMD="${{ github.event.inputs.command || 'auto' }}"
+          if [ "$CMD" = "backtest" ]; then
+            python -m macroflow.main backtest --start "${{ github.event.inputs.start }}" --telegram
+          else
+            python -m macroflow.main $CMD
+          fi
+
+      - name: Simpan hasil backtest
+        if: github.event.inputs.command == 'backtest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-hasil
+          path: backtest_hasil.xlsx
+          if-no-files-found: warn
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            state.json
+            tickers.txt
+          key: macroflow-state-${{ github.run_id }}
