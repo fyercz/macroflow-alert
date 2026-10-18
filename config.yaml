@@ -1,0 +1,43 @@
+# ==========================================================
+# MacroFlow V65 Alert — konfigurasi
+# ==========================================================
+
+# Kosongkan = semua saham IDX (daftar otomatis diperbarui tiap 7 hari).
+# Isi kalau mau batasi, contoh:
+# tickers: [BBCA, BBRI, ANTM, ARCI]
+tickers: []
+
+# Indeks yang selalu dicek (tanpa filter likuiditas), tampil paling atas di Telegram.
+# ROYAL dimatikan untuk IHSG karena volume indeks di Yahoo tidak akurat.
+indices:
+  IHSG:
+    yahoo: "^JKSE"
+    tradingview: "IDX:COMPOSITE"
+    signals: [COMBO, GOLDEN, STANDAR, METER]
+
+# Filter supaya saham tidak likuid tidak ikut dikirim
+filter:
+  min_avg_value: 2000000000   # rata-rata nilai transaksi 20 hari (Rp). 2 M = 2 miliar
+  min_price: 50               # harga minimum (Rp)
+
+# Sinyal yang dikirim per timeframe (hapus yang tidak perlu)
+signals:
+  D:  [ROYAL, COMBO, GOLDEN, STANDAR, METER]
+  1H: [ROYAL, COMBO, GOLDEN, STANDAR, METER]
+
+# Parameter indikator (sama dengan input Pine Script)
+params:
+  ut_key: 2.0          # Illu Trx Key Value
+  ut_period: 10        # Illu Trx ATR Period
+  stoch_k: 14
+  stoch_d: 3
+  stoch_s: 3
+  meter_ema: 50
+  meter_rsi: 14
+  meter_adx: 14
+  meter_thres: 20
+  atr_mult_sl: 2.0     # SL = close - ATR14 x angka ini; TP1 = 2R, TP2 = 3R
+
+# Panjang histori yang diunduh
+daily_period: 3y
+hourly_period: 1y
