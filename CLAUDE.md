@@ -70,8 +70,12 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 - `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (8 tes, ±20 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
-- Backtest dengan data asli **belum dianalisis** — pengguna diminta menjalankan `backtest`
-  (mulai 2026-09-01 atau 2026-10-12 untuk 1 minggu) lalu upload Excel hasilnya.
+- Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:
+  periode itu crash IHSG (16 Okt −11,57% ke 5.185, trading halt, isu MSCI). Hasil: 477 sinyal D + 1.818 sinyal 1H
+  dalam 3 hari (terlalu ramai, sering 2–4 sinyal di candle yg sama); hampir semua BUY kena SL (win rate 0–11%),
+  SELL 1H benar 54–67%. Daily belum punya data 5 bar. Usulan ke pengguna (belum dikerjakan):
+  backtest periode normal lebih panjang (mis. Apr–Sep 2026), tambah input `end` & `tf` di workflow,
+  filter pasar (tahan BUY saat meter IHSG SELL), gabung sinyal ganda per saham per candle.
 
 ## Ide lanjutan yang pernah ditawarkan (belum dikerjakan)
 
