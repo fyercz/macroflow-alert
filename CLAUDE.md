@@ -73,6 +73,10 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 - Sandbox Claude **tidak bisa** mengakses Yahoo, TradingView, Telegram (egress diblokir). Uji dengan
   `tests/test_smoke.py` (data sintetis, mock download). Data asli hanya jalan di GitHub Actions / komputer pengguna.
+- **Selain tes smoke, jalankan `python tests/yahoo_sim.py <perintah>`** (yfinance palsu berbentuk data Yahoo asli:
+  index bernama Date/Datetime, tz Asia/Jakarta, MultiIndex, baris NaN). Bug 19 Okt (`ihsg-study` KeyError 'Tanggal'
+  karena index bernama "Date") lolos tes smoke tapi tertangkap simulasi ini. Hapus state.json/*.xlsx sesudahnya.
+- GitHub API (gh/api.github.com) diblokir proxy sesi → log run Actions tidak bisa dibaca; minta pengguna tempel log.
 - `raw.githubusercontent.com` bisa diakses → cek isi repo public dengan membandingkan file lokal vs raw.
 - Push ke GitHub hanya bisa kalau repo dilampirkan sebagai sumber sesi **atau** pengguna memberi PAT di chat.
   Pakai PAT hanya lewat `git -c http.extraHeader=...` per perintah — jangan simpan di `.git/config`/file,
