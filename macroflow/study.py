@@ -173,7 +173,7 @@ def write_excel(out, summary, regime_tbl, eps, df):
         if len(e):
             e["Tanggal"] = e["Tanggal"].dt.strftime("%Y-%m-%d")
         e.to_excel(xw, sheet_name="Episode", index=False)
-        h = df.reset_index().rename(columns={"index": "Tanggal"})
+        h = df.rename_axis("Tanggal").reset_index()  # index Yahoo bernama "Date"
         h["Tanggal"] = pd.to_datetime(h["Tanggal"]).dt.strftime("%Y-%m-%d")
         h.to_excel(xw, sheet_name="Harian", index=False)
         pd.DataFrame({"Catatan": [

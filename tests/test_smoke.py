@@ -322,6 +322,7 @@ def test_ihsg_study():
     from macroflow import study
     long_h = make_hourly(7, 6000, days=700)
     long_d = daily_from_hourly(long_h)
+    long_d.index.name = "Date"  # seperti data Yahoo asli (bug 19 Okt: KeyError 'Tanggal')
     old = data.download
     data.download = lambda tickers, period, interval, **kw: (
         {"IHSG": (long_d if interval == "1d" else long_h[long_h.index >= long_h.index[-6 * 250]]).copy()})
