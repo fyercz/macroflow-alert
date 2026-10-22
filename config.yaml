@@ -29,7 +29,8 @@ filter:
 
 # Sinyal yang dikirim per timeframe & arah (hapus yang tidak perlu).
 # Pilihan: ROYAL, COMBO, GOLDEN (khusus BUY), STANDAR, METER,
-#          SMC: CHOCH (pembalikan struktur), BOS (lanjutan struktur), OB (retest order block), FVG (fair value gap).
+#          SMC (port LuxAlgo): CHOCH (pembalikan struktur), BOS (lanjutan struktur),
+#          OB (order block ditembus: BUY = supply jebol ke atas, SELL = demand jebol ke bawah), FVG (fair value gap).
 # Bisa juga ditulis singkat untuk kedua arah, contoh:  D: [COMBO, METER]
 # Dasar pilihan saat ini: backtest 1 Apr–30 Sep 2026 (GOLDEN paling rugi; 1H BUY terbaik COMBO & METER).
 # SMC di 1H hanya CHOCH & OB (BOS & FVG di 1H sangat sering muncul) — tambahkan kalau mau.
@@ -53,7 +54,8 @@ market_warning:
 
 # Parameter indikator (sama dengan input Pine Script)
 params:
-  smc_swing: 5         # SMC: candle kiri/kanan untuk swing high/low (makin besar = struktur makin besar & jarang)
+  smc_swing: 50        # SMC LuxAlgo: panjang struktur swing (garis tegas di chart)
+  smc_internal: 5      # SMC LuxAlgo: panjang struktur internal (garis putus-putus)
   heikin_ashi: true    # semua indikator dihitung dari candle Heikin Ashi (seperti chart HA di TradingView).
                        # Harga yang ditampilkan, SL/TP, dan backtest tetap memakai harga asli.
   ut_key: 2.0          # Illu Trx Key Value

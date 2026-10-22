@@ -23,7 +23,8 @@ class Params:
     meter_thres: int = 20
     meter_ma: str = "EMA"      # MA untuk Meter STRONG: "EMA" (saham) atau "SMA" (alert indeks)
     heikin_ashi: bool = True   # indikator dihitung dari candle Heikin Ashi (seperti chart TradingView HA)
-    smc_swing: int = 5         # SMC: jumlah candle kiri/kanan untuk swing high/low
+    smc_swing: int = 50        # SMC (LuxAlgo): panjang leg struktur swing
+    smc_internal: int = 5      # SMC (LuxAlgo): panjang leg struktur internal
     atr_mult_sl: float = 2.0
 
 
@@ -173,7 +174,7 @@ def evaluate(chart, daily, hourly, tf, p: Params, last_n=1):
     meter_buy = (mtxt == "STRONG BUY") & (mtxt_prev != "STRONG BUY")
     meter_sell = (mtxt == "STRONG SELL") & (mtxt_prev != "STRONG SELL")
 
-    sm = smc_mod.detect(o, h, l, c, p.smc_swing)
+    sm = smc_mod.detect(o, h, l, c, p.smc_swing, p.smc_internal)
 
     vol_ok_buy = (v > vol_sma) & (c > o)
     vol_ok_sell = (v > vol_sma) & (c < o)
@@ -224,6 +225,8 @@ def evaluate(chart, daily, hourly, tf, p: Params, last_n=1):
                 sig = Signal(name, side, t, rc[i], dict(info))
                 if (name, side, i) in sm.zones:  # zona OB / FVG (skala candle indikator)
                     sig.info["zone"] = sm.zones[(name, side, i)]
+                if (name, side, i) in sm.levels:  # CHoCH/BOS: internal / swing
+                    sig.info["smc_level"] = sm.levels[(name, side, i)]
                 if side == "BUY":
                     sig.info.update(sl_tp(rc[i], atr14[i], p))
                 out.append(sig)

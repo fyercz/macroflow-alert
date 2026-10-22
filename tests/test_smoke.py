@@ -489,59 +489,68 @@ def _zigzag(points, steps=6):
 
 
 def test_smc_structure():
+    """Struktur swing LuxAlgo: higher high berulang = BOS bullish, patahan pertama ke bawah = CHoCH."""
     from macroflow import smc
-    # naik dengan swing makin tinggi (BOS bullish), lalu jatuh tembus swing low (CHoCH bearish)
-    o, h, l, c = _zigzag([100, 110, 104, 116, 108, 124, 115, 128, 118, 95, 105, 90], steps=6)
-    r = smc.detect(o, h, l, c, swing=3)
-    assert r.bos_buy.sum() >= 2, "struktur naik harus menghasilkan BOS bullish"
-    first_sell = np.argmax(r.choch_sell)
-    assert r.choch_sell.any() and not r.bos_sell[:first_sell].any(), "patahan pertama ke bawah = CHoCH"
-    assert all(np.argmax(r.bos_buy) < first_sell for _ in [0])
-    # setelah CHoCH bearish, patahan bawah berikutnya = BOS bearish
-    assert r.bos_sell[first_sell + 1:].any()
-    # tidak ada BUY & SELL struktur di candle yang sama
+    o, h, l, c = _zigzag([100, 92, 100, 110, 104, 116, 108, 124, 115, 128, 118, 95, 105, 90], steps=6)
+    r = smc.detect(o, h, l, c, swing=6, internal=3)
+    bos_up = np.where(r.bos_buy)[0]
+    first_sell = int(np.argmax(r.choch_sell))
+    assert len(bos_up) >= 2 and r.choch_sell.any() and bos_up.max() < first_sell
+    assert not r.bos_sell[:first_sell].any() and r.bos_sell[first_sell + 1:].any()
+    assert r.levels[("CHOCH", "SELL", first_sell)] == "swing"
     assert not (r.bos_buy & r.bos_sell).any() and not (r.choch_buy & r.choch_sell).any()
+
+
+def test_smc_internal_and_order_blocks():
+    """Data acak: struktur internal muncul, dan setiap alert OB = zona benar-benar ditembus."""
+    from macroflow import smc
+    for df in (ta.heikin_ashi(HOURLY["BBBB"]), ta.heikin_ashi(DAILY["AAAA"])):
+        o, h, l, c = (df[k].to_numpy(float) for k in ("Open", "High", "Low", "Close"))
+        r = smc.detect(o, h, l, c)
+        assert "internal" in r.levels.values()
+        assert r.ob_buy.any() or r.ob_sell.any()
+        for j in np.where(r.ob_sell)[0]:   # demand (bullish OB) jebol ke bawah
+            assert l[j] < r.zones[("OB", "SELL", j)][0]
+        for j in np.where(r.ob_buy)[0]:    # supply (bearish OB) jebol ke atas
+            assert h[j] > r.zones[("OB", "BUY", j)][1]
+        # struktur internal tidak muncul sebelum ada pivot swing (extraCondition LuxAlgo)
+        first_internal = min(j for (_, _, j), v in r.levels.items() if "internal" in v)
+        assert first_internal > 50
 
 
 def test_smc_no_repaint():
     """Sinyal SMC di candle i tidak berubah kalau data sesudah i ditambahkan."""
     from macroflow import smc
-    d = ta.heikin_ashi(DAILY["BBBB"])
+    d = ta.heikin_ashi(HOURLY["AAAA"])
     o, h, l, c = (d[k].to_numpy(float) for k in ("Open", "High", "Low", "Close"))
-    full = smc.detect(o, h, l, c, 5)
-    for cut in (150, 200, 240):
-        part = smc.detect(o[:cut], h[:cut], l[:cut], c[:cut], 5)
+    full = smc.detect(o, h, l, c)
+    for cut in (400, 900, 1300):
+        part = smc.detect(o[:cut], h[:cut], l[:cut], c[:cut])
         for name in ("choch_buy", "choch_sell", "bos_buy", "bos_sell", "ob_buy", "ob_sell",
                      "fvg_buy", "fvg_sell"):
             assert (getattr(part, name) == getattr(full, name)[:cut]).all(), name
 
 
-def test_smc_fvg_and_ob():
+def test_smc_fvg():
     from macroflow import smc
-    # FVG bullish: candle 1 sangat besar sehingga low candle 2 > high candle 0
     n = 40
     c = np.full(n, 100.0); o = c.copy(); h = c + 0.5; l = c - 0.5
     o[30], c[30], h[30], l[30] = 100, 110, 110.5, 99.8
     o[31], c[31], h[31], l[31] = 110, 111, 111.5, 109
-    r = smc.detect(o, h, l, c, swing=3)
+    r = smc.detect(o, h, l, c, swing=10, internal=3)
     assert r.fvg_buy[31] and r.zones[("FVG", "BUY", 31)] == (100.5, 109)
-    # OB: setelah BOS naik, harga kembali ke zona demand -> retest
-    o2, h2, l2, c2 = _zigzag([100, 110, 104, 116, 105, 124, 118, 130], steps=6)
-    r2 = smc.detect(o2, h2, l2, c2, swing=3)
-    assert r2.ob_buy.any()
-    j = int(np.argmax(r2.ob_buy))
-    lo, hi = r2.zones[("OB", "BUY", j)]
-    assert l2[j] <= hi and c2[j] >= lo
+    assert r.fvg_buy.sum() == 1 and not r.fvg_sell.any()
 
 
 def test_smc_in_messages():
     from macroflow.signals import Signal
     notify.TV_SYMBOLS.clear()
     info = {"chg": 1.0, "rsi": 60, "vol_ratio": 2.0, "sl": 950, "tp1": 1100, "tp2": 1150}
-    items = [("AAAA", Signal("CHOCH", "BUY", TODAY, 1000.0, dict(info))),
+    items = [("AAAA", Signal("CHOCH", "BUY", TODAY, 1000.0, dict(info, smc_level="swing"))),
              ("AAAA", Signal("OB", "BUY", TODAY, 1000.0, dict(info, zone=(960.0, 985.0))))]
     msg = "\n".join(notify.build_messages("H", items))
-    assert "🔄CHoCH + 🧱OB (OB zone 960–985)" in msg and "change of character" in msg
+    assert "🔄CHoCH(swing) + 🧱OB (OB zone 960–985)" in msg and "change of character" in msg
+    assert "LuxAlgo" in msg
     d, h = DAILY["BBBB"], HOURLY["BBBB"]
     names = {s.name for s in evaluate(h, d, h, "1H", Params(), last_n=len(h) - 1)}
     assert {"CHOCH", "BOS", "OB"} <= names

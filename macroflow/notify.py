@@ -17,14 +17,16 @@ TITLE = {
     "METER": "📶 METER STRONG",
     "CHOCH": "🔄 SMC CHoCH (trend reversal)",
     "BOS": "⏩ SMC BOS (trend continuation)",
-    "OB": "🧱 SMC ORDER BLOCK retest",
+    "OB": "🧱 SMC ORDER BLOCK breakout",
     "FVG": "🕳 SMC FAIR VALUE GAP",
 }
 SHORT = {"ROYAL": "👑ROYAL", "COMBO": "🔷COMBO", "GOLDEN": "🌟GOLDEN",
          "STANDAR": "📍STANDARD", "METER": "📶STRONG",
          "CHOCH": "🔄CHoCH", "BOS": "⏩BOS", "OB": "🧱OB", "FVG": "🕳FVG"}
-SMC_LEGEND = ("🔄CHoCH = change of character (structure flips) · ⏩BOS = break of structure (trend continues) · "
-              "🧱OB = retest of an order block (demand for BUY / supply for SELL) · 🕳FVG = new fair value gap")
+SMC_LEGEND = ("SMC (LuxAlgo): 🔄CHoCH = change of character (structure flips) · ⏩BOS = break of structure "
+              "(trend continues) · (int) = internal structure, (swing) = swing structure · 🧱OB = order block "
+              "broken (BUY: price broke above a supply OB, SELL: price broke below a demand OB) · "
+              "🕳FVG = new fair value gap")
 LEGEND = ("<i>👑ROYAL = H4+D+W meters + volume · 🔷COMBO = Illu Trx + EMA50 + MACD + RSI · "
           "📍STANDARD = Illu Trx reversal · 📶STRONG = Meter STRONG BUY/SELL · 🌟GOLDEN = MA200 + Stoch · "
           + SMC_LEGEND + " · Prices: regular candles, signals & zones: Heikin Ashi</i>")
@@ -77,6 +79,13 @@ def merge_signals(items):
     return out
 
 
+def short_name(s):
+    """Nama singkat sinyal, CHoCH/BOS diberi lapis struktur: 🔄CHoCH(swing)."""
+    lvl = s.info.get("smc_level")
+    lvl = {"internal": "int", "swing+internal": "swing+int"}.get(lvl, lvl)
+    return SHORT[s.name] + (f"({lvl})" if lvl else "")
+
+
 def zone_text(sigs, fmt=None):
     """' (OB zone 950–980)' untuk sinyal OB/FVG yang punya zona."""
     fmt = fmt or fmt_price
@@ -86,7 +95,7 @@ def zone_text(sigs, fmt=None):
 
 
 def _merged_line(ticker, sigs, show_time=False):
-    names = " + ".join(SHORT[s.name] for s in sigs) + zone_text(sigs)
+    names = " + ".join(short_name(s) for s in sigs) + zone_text(sigs)
     when = f" · {sigs[0].bar_time:%H:%M}" if show_time else ""
     # baris harga/SL memakai sinyal pertama (semua sinyal di candle yang sama)
     return fmt_signal_line(ticker, sigs[0]).replace("\n", f" · <b>{names}</b>{when}\n", 1)

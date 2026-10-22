@@ -14,7 +14,7 @@ import logging
 import pandas as pd
 
 from . import data, market, notify
-from .notify import SHORT, esc
+from .notify import esc
 from .signals import Params, evaluate
 
 log = logging.getLogger("macroflow.index")
@@ -106,7 +106,7 @@ def fmt_signals(rows):
         emoji = "🟢" if side == "BUY" else "🔴"
         when = (f"Daily {market.tgl(bt)}" if tf == "D"
                 else f"<b>Weekly</b> week ending {market.tgl(bt)}")
-        names = " + ".join(SHORT[s.name] for s in sigs) + notify.zone_text(sigs, market.fmt_index)
+        names = " + ".join(notify.short_name(s) for s in sigs) + notify.zone_text(sigs, market.fmt_index)
         extra = [f"close {market.fmt_index(s0.close)}"]
         if s0.info.get("chg") == s0.info.get("chg"):  # bukan NaN
             extra.append(f"{s0.info['chg']:+.1f}%")

@@ -14,22 +14,13 @@ Sinyal dikirim ke Telegram dan dijalankan otomatis gratis di GitHub Actions.
 | 📶 METER STRONG | Meter timeframe chart berubah menjadi STRONG BUY / STRONG SELL |
 | 🔄 SMC CHoCH | *Change of Character*: close menembus swing high/low terakhir **berlawanan** arah struktur sebelumnya (pembalikan) |
 | ⏩ SMC BOS | *Break of Structure*: close menembus swing high/low terakhir **searah** struktur (lanjutan tren) |
-| 🧱 SMC Order Block | Retest pertama zona demand (BUY) / supply (SELL) yang terbentuk saat BOS/CHoCH. Zona ikut ditampilkan |
-| 🕳 SMC FVG | *Fair Value Gap* baru: celah 3 candle dengan candle tengah besar. Zona celah ikut ditampilkan |
+| 🧱 SMC Order Block | Order block **ditembus** (seperti alert "OB Breakout" LuxAlgo): BUY = zona supply jebol ke atas, SELL = zona demand jebol ke bawah. Zona ikut ditampilkan |
+| 🕳 SMC FVG | *Fair Value Gap* baru (Auto Threshold LuxAlgo). Zona celah ikut ditampilkan |
 
-SMC dihitung tanpa repaint: swing high/low baru diakui setelah `smc_swing` candle (default 5) di kanannya,
-sama seperti `ta.pivothigh` di Pine. SMC memakai candle Heikin Ashi (sama dengan chart). Harga zona = skala Heikin Ashi.
-
-**Candle: Heikin Ashi.** Semua indikator (Illu Trx, EMA, RSI, MACD, Stoch, ADX, Meter) dihitung dari candle
-Heikin Ashi, sama seperti indikator di chart Heikin Ashi TradingView. Timeframe tinggi (H4, Daily, Weekly) disusun
-dari candle biasa lalu dijadikan Heikin Ashi, seperti `request.security` di chart HA. **Harga yang ditampilkan,
-% perubahan, SL/TP, dan perhitungan backtest tetap memakai harga asli** (harga Heikin Ashi bukan harga transaksi).
-Level "Stop Illu" mengikuti garis Illu Trx di chart HA. Bisa dimatikan dengan `params.heikin_ashi: false`.
-
-**Bahasa pesan Telegram: Inggris** (istilah dan format angka bahasa Inggris, misalnya `1,273` dan `6,712.45`).
-
-Setiap sinyal disertai harga, % perubahan, RSI, dan rasio volume. Sinyal BUY ditambah
-SL = close − 2×ATR14, TP1 = 2R, TP2 = 3R (dibulatkan ke fraksi harga BEI). Sinyal SELL ditambah level trailing stop Illu Trx.
+SMC adalah port dari **Smart Money Concepts [LuxAlgo]** (CC BY-NC-SA 4.0) dengan setelan default-nya:
+struktur *internal* (5) dan *swing* (50) — di pesan ditandai `(int)` / `(swing)` — internal order block dengan
+filter ATR200 dan mitigasi High/Low, serta FVG auto threshold. Tidak repaint, dan dihitung dari candle
+Heikin Ashi (sama dengan chart). Harga zona = skala Heikin Ashi. Atur di `params.smc_swing` / `params.smc_internal`.
 
 **Yang aktif saat ini** (berdasarkan backtest 1 Apr–30 Sep 2026, bisa diubah di `config.yaml`):
 
