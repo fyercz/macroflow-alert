@@ -227,11 +227,12 @@ def telegram_summary(summary, start, end):
         lines.append(f"\n<b>Timeframe {tf}</b>")
         for _, r in g.iterrows():
             emoji = "🟢" if r["Arah"] == "BUY" else "🔴"
-            txt = f"{emoji} {r['Sinyal']} {r['Arah']}: {r['Jumlah']} sinyal"
+            name = "STANDARD" if r["Sinyal"] == "STANDAR" else r["Sinyal"]
+            txt = f"{emoji} {name} {r['Arah']}: {r['Jumlah']} signals"
             if r["Arah"] == "BUY" and not pd.isna(r.get("Win rate %")):
                 txt += f" | win {r['Win rate %']:.0f}% (TP2 {r['TP2']}, TP1 {r['TP1']}, SL {r['SL']})"
             if not pd.isna(r["Arah benar 5 bar %"]):
-                txt += f" | benar 5 bar {r['Arah benar 5 bar %']:.0f}%"
+                txt += f" | right direction after 5 bars {r['Arah benar 5 bar %']:.0f}%"
             lines.append(txt)
-    lines.append("\nDetail lengkap ada di file Excel hasil backtest.")
+    lines.append("\nFull details are in the backtest Excel file.")
     return "\n".join(lines)

@@ -197,8 +197,8 @@ def test_run_modes_and_dedup():
         tg2 = FakeTelegram()
         main.run_modes(["hourly", "daily-final"], CFG, NOW, tg2, state)
         assert len(state.d["sent"]) == n_sent
-        assert not any("SINYAL FINAL" in m for m in tg2.sent)
-        assert not any("SINYAL 1H" in m for m in tg2.sent)
+        assert not any("FINAL SIGNALS" in m for m in tg2.sent)
+        assert not any("1H SIGNALS" in m for m in tg2.sent)
 
 
 def test_backtest_excel():
@@ -271,11 +271,11 @@ def test_merge_messages():
              ("CCCC", Signal("COMBO", "BUY", TODAY, 800.0, dict(info)))]
     msg = "\n".join(notify.build_messages("HDR", items))
     assert msg.count(">AAAA<") == 1 and "🔷COMBO + 📶STRONG" in msg
-    assert "🟢 <b>BUY</b> — 2 saham" in msg and "🔴 <b>SELL</b> — 1 saham" in msg
+    assert "🟢 <b>BUY</b> — 2 stocks" in msg and "🔴 <b>SELL</b> — 1 stocks" in msg
     assert msg.index(">AAAA<") < msg.index(">CCCC<")  # sinyal terbanyak di atas
     long = [(f"T{i:03d}", Signal("COMBO", "BUY", TODAY, 1000.0, dict(info))) for i in range(150)]
     msgs = notify.build_messages("JUDUL\nSTATUS PANJANG", long)
-    assert len(msgs) > 1 and msgs[1].startswith("JUDUL (lanjutan)") and "STATUS" not in msgs[1]
+    assert len(msgs) > 1 and msgs[1].startswith("JUDUL (continued)") and "STATUS" not in msgs[1]
 
 
 def test_market_status_warning():
@@ -285,20 +285,20 @@ def test_market_status_warning():
     assert s.trend == "TURUN" and s.warning and len(s.sells) >= 2
     assert all(e.time >= pd.Timestamp("2026-10-12") and e.side == "SELL" for e in s.sells)
     assert len({(e.time, e.tf) for e in s.sells}) == len(s.sells)  # 1 kejadian per candle
-    assert s.regime in ("UPTREND", "DOWNTREND", "TRANSISI") and "Rezim:" in s.text()
+    assert s.regime in ("UPTREND", "DOWNTREND", "TRANSISI") and "Regime:" in s.text()
     only_meter = market.ihsg_status(daily_from_hourly(h), now, Params(), signals=("METER",))
     assert all(e.names == ["METER"] for e in only_meter.sells)
     assert len(only_meter.sells) <= len(s.sells)
     d_only = market.ihsg_status(daily_from_hourly(h), now, Params(), timeframes=("D",))
     assert all(e.tf == "D" for e in d_only.sells + d_only.buys)
     txt = s.text()
-    assert "PERINGATAN KERAS" in txt and "STATUS IHSG" in txt
+    assert "STRONG WARNING" in txt and "IHSG STATUS" in txt
     calm = market.ihsg_status(DAILY["IHSG"], now, Params())
-    assert calm is not None and "STATUS IHSG" in calm.text()
+    assert calm is not None and "IHSG STATUS" in calm.text()
     strict = market.ihsg_status(daily_from_hourly(h), now, Params(), min_events=99)
     assert all(e.tf in ("D", "W") for e in s.sells + s.buys)
     assert "W: <b>" in txt and "1H" not in txt
-    assert not strict.warning and "PERINGATAN KERAS" not in strict.text()
+    assert not strict.warning and "STRONG WARNING" not in strict.text()
 
 
 def test_run_modes_ihsg_warning():
@@ -313,8 +313,8 @@ def test_run_modes_ihsg_warning():
             state = main.State(Path(tmp) / "state.json")
             tg = FakeTelegram()
             main.run_modes(["hourly", "daily-final"], CFG, NOW, tg, state)
-            assert tg.sent[0].startswith("🚨🚨🚨 <b>PERINGATAN KERAS")
-            assert all("STATUS IHSG" in m for m in tg.sent[1:2])
+            assert tg.sent[0].startswith("🚨🚨🚨 <b>STRONG WARNING")
+            assert all("IHSG STATUS" in m for m in tg.sent[1:2])
             tg2 = FakeTelegram()
             main.run_modes(["hourly"], CFG, NOW, tg2, state)
             assert not any(m.startswith("🚨") for m in tg2.sent)  # pesan khusus cukup 1x/hari
@@ -348,7 +348,7 @@ def test_ihsg_study():
             assert "Ada 1H" not in harian.columns
             assert set(reg["TF"]) <= {"D", "W"}
             txt = study.telegram_text(summary, reg)
-            assert "STUDI POLA IHSG" in txt and "episode" in txt
+            assert "IHSG PATTERN STUDY" in txt and "episodes" in txt
     finally:
         data.download = old
 
@@ -414,7 +414,7 @@ def test_index_alert_run():
             index_alert.run(CFG, NOW, tg3, state, "IDX", Params(), kw)
             msg = "\n".join(tg3.sent)
             if tg3.sent:
-                assert "ALERT INDEKS" in msg and "SMA50" in msg and "STATUS IHSG" in msg
+                assert "INDEX ALERT" in msg and "SMA50" in msg and "IHSG STATUS" in msg
                 assert "1H" not in msg and "S&P 500" not in msg
             # sinyal hanya D / W, dan bukan ROYAL / GOLDEN
             for k in state.d["sent"]:
@@ -432,7 +432,7 @@ def test_index_alert_messages_format():
             ("W", Signal("STANDAR", "BUY", TODAY, 6712.45, {"chg": 0.5, "rsi": 55, "stop": 6500.0}))]
     lines = index_alert.fmt_signals(rows)
     assert len(lines) == 2 and "🔷COMBO + 📶STRONG" in lines[0] and "Weekly" in lines[1]
-    assert "6.712,45" in lines[0]
+    assert "6,712.45" in lines[0]
 
 
 def test_heikin_ashi():
@@ -457,6 +457,24 @@ def test_signals_use_heikin_ashi_but_real_prices():
             assert s.info["sl"] < s.close
     p = main.params_from({"params": {"heikin_ashi": "false"}})
     assert p.heikin_ashi is False and main.params_from({}).heikin_ashi is True
+
+
+def test_alerts_in_english():
+    """Semua teks Telegram dalam bahasa Inggris (permintaan pengguna 23 Okt 2026)."""
+    import re
+    from macroflow import index_alert
+    from macroflow.signals import Signal
+    notify.TV_SYMBOLS.clear()
+    h = make_crash_index()
+    st = market.ihsg_status(daily_from_hourly(h), pd.Timestamp("2026-10-16 16:20"), Params())
+    info = {"chg": 1.0, "rsi": 60, "vol_ratio": 2.0, "sl": 950, "tp1": 1100, "tp2": 1150, "stop": 900}
+    sig = [("AAAA", Signal("STANDAR", "BUY", TODAY, 1000.0, dict(info)))]
+    texts = [st.text(), st.warning_text(), "\n".join(notify.build_messages("H", sig)),
+             "\n".join(index_alert.fmt_signals([("W", sig[0][1])]))]
+    indo = re.compile(r"\b(sinyal|saham|harga|hari|minggu|naik|turun|peringatan|keras|sejak|dalam|"
+                      r"terakhir|lanjutan|sementara|batal|di atas|di bawah|rezim|bursa|STANDAR)\b", re.I)
+    for t in texts:
+        assert not indo.search(t), indo.search(t).group(0)
 
 
 if __name__ == "__main__":

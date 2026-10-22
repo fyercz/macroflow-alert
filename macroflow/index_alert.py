@@ -23,7 +23,7 @@ DEFAULT_INDICES = {
     "IHSG": {"yahoo": "^JKSE", "tradingview": "IDX:COMPOSITE", "name": "IHSG", "market": "IDX"},
     "SP500": {"yahoo": "^GSPC", "tradingview": "SP:SPX", "name": "S&P 500", "market": "US"},
 }
-MARKET_LABEL = {"IDX": "Bursa Indonesia", "US": "Bursa AS"}
+MARKET_LABEL = {"IDX": "Indonesia", "US": "US market"}
 
 
 def specs(cfg):
@@ -105,7 +105,7 @@ def fmt_signals(rows):
         s0 = sigs[0]
         emoji = "🟢" if side == "BUY" else "🔴"
         when = (f"Daily {market.tgl(bt)}" if tf == "D"
-                else f"<b>Weekly</b> minggu s/d {market.tgl(bt)}")
+                else f"<b>Weekly</b> week ending {market.tgl(bt)}")
         names = " + ".join(SHORT[s.name] for s in sigs)
         extra = [f"close {market.fmt_index(s0.close)}"]
         if s0.info.get("chg") == s0.info.get("chg"):  # bukan NaN
@@ -162,15 +162,16 @@ def run(cfg, now, tg, state, mkt, base_params, market_kwargs):
         if status:
             parts.append(status.text())
         if rows:
-            parts.append(f"🆕 <b>Sinyal baru {esc(sp['name'])}</b>\n" + "\n".join(fmt_signals(rows)))
+            parts.append(f"🆕 <b>New {esc(sp['name'])} signals</b>\n" + "\n".join(fmt_signals(rows)))
         blocks.append("\n\n".join(parts))
         log.info("%s: %d sinyal baru%s", code, len(rows), " + peringatan" if warn_new else "")
 
     if blocks:
-        header = (f"📈 <b>ALERT INDEKS — {MARKET_LABEL.get(mkt, mkt)}</b> (Daily & Weekly)\n"
-                  f"{market.tgl(now_naive)} {now_naive.year}, {now_naive:%H:%M} WIB · "
-                  f"<i>STRONG = Meter dengan {p.meter_ma}50</i>")
-        legend = (f"<i>📶STRONG = Meter STRONG BUY/SELL (harga vs {p.meter_ma}50 + RSI14 + ADX14) · "
-                  "🔷COMBO = Illu Trx + EMA50 + MACD + RSI · 📍STANDAR = Illu Trx berbalik arah</i>")
+        header = (f"📈 <b>INDEX ALERT — {MARKET_LABEL.get(mkt, mkt)}</b> (Daily & Weekly)\n"
+                  f"{market.tgl(now_naive)}, {now_naive.year} {now_naive:%H:%M} WIB · "
+                  f"<i>STRONG = Meter using {p.meter_ma}50</i>")
+        legend = (f"<i>📶STRONG = Meter STRONG BUY/SELL (price vs {p.meter_ma}50 + RSI14 + ADX14) · "
+                  "🔷COMBO = Illu Trx + EMA50 + MACD + RSI · 📍STANDARD = Illu Trx reversal · "
+                  "Signals from Heikin Ashi candles, prices are regular</i>")
         tg.send_all(notify.split_messages(header, blocks + [legend]))
     state.save(now_naive.normalize())

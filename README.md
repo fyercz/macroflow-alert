@@ -19,6 +19,8 @@ dari candle biasa lalu dijadikan Heikin Ashi, seperti `request.security` di char
 % perubahan, SL/TP, dan perhitungan backtest tetap memakai harga asli** (harga Heikin Ashi bukan harga transaksi).
 Level "Stop Illu" mengikuti garis Illu Trx di chart HA. Bisa dimatikan dengan `params.heikin_ashi: false`.
 
+**Bahasa pesan Telegram: Inggris** (istilah dan format angka bahasa Inggris, misalnya `1,273` dan `6,712.45`).
+
 Setiap sinyal disertai harga, % perubahan, RSI, dan rasio volume. Sinyal BUY ditambah
 SL = close − 2×ATR14, TP1 = 2R, TP2 = 3R (dibulatkan ke fraksi harga BEI). Sinyal SELL ditambah level trailing stop Illu Trx.
 

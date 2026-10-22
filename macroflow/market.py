@@ -18,22 +18,25 @@ from . import indicators as ta
 from .notify import SHORT, TV_SYMBOLS, esc
 from .signals import Params, candles, evaluate, meter
 
-HARI = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
-BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+HARI = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+BULAN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+# label tampilan (bahasa Inggris); nilai internal tetap
+TREND_EN = {"NAIK": "UP", "TURUN": "DOWN", "CAMPURAN": "MIXED"}
+REGIME_EN = {"UPTREND": "UPTREND", "DOWNTREND": "DOWNTREND", "TRANSISI": "TRANSITION"}
 LINE = "━━━━━━━━━━━━━━━━━━"
 DEFAULT_SIGNALS = ("COMBO", "STANDAR", "METER")
 SLOPE_BARS = 20  # arah EMA200 = perubahan EMA200 dalam 20 hari bursa
 
 
 def fmt_index(x):
-    """Angka indeks gaya Indonesia: 6.712,45"""
+    """Angka indeks: 6,712.45"""
     if x is None or np.isnan(x):
         return "-"
-    return f"{x:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"{x:,.2f}"
 
 
 def tgl(ts, with_time=False):
-    s = f"{HARI[ts.weekday()]} {ts.day} {BULAN[ts.month - 1]}"
+    s = f"{HARI[ts.weekday()]} {BULAN[ts.month - 1]} {ts.day}"
     return s + (f" {ts:%H:%M}" if with_time else "")
 
 
@@ -47,7 +50,7 @@ class Event:
 
     def label(self):
         names = " + ".join(SHORT.get(n, n) for n in self.names)
-        note = " — belum close" if self.partial else ""
+        note = " — not closed yet" if self.partial else ""
         tf = "Daily" if self.tf == "D" else "Weekly"
         return f"{tgl(self.time)} ({tf}{note}): {names}"
 
@@ -142,14 +145,14 @@ class MarketStatus:
         return self.regime == "UPTREND" and len(self.buys) >= self.min_events
 
     def _regime_line(self):
-        arrow = "↑ naik" if self.ema200_slope > 0 else "↓ turun"
-        pos = "di atas" if self.above_ema200 else "di bawah"
+        arrow = "↑ rising" if self.ema200_slope > 0 else "↓ falling"
+        pos = "above" if self.above_ema200 else "below"
         emoji = {"UPTREND": "🟢", "DOWNTREND": "🔴"}.get(self.regime, "🟡")
-        note = {"UPTREND": "SELL tunggal sering jebakan",
-                "DOWNTREND": "BUY biasanya hanya pantulan",
-                "TRANSISI": "arah besar belum jelas"}[self.regime]
-        return (f"Rezim: {emoji} <b>{self.regime}</b> — harga {pos} EMA200, EMA200 {arrow} "
-                f"({self.ema200_slope:+.1f}%/{SLOPE_BARS} hari) · <i>{note}</i>")
+        note = {"UPTREND": "single SELL signals are often traps",
+                "DOWNTREND": "BUY signals are usually just bounces",
+                "TRANSISI": "major trend not clear yet"}[self.regime]
+        return (f"Regime: {emoji} <b>{REGIME_EN[self.regime]}</b> — price {pos} EMA200, EMA200 {arrow} "
+                f"({self.ema200_slope:+.1f}% / {SLOPE_BARS} days) · <i>{note}</i>")
 
     def text(self):
         emoji = {"NAIK": "🟢", "TURUN": "🔴"}.get(self.trend, "🟡")
@@ -158,41 +161,42 @@ class MarketStatus:
         illu = "BUY" if self.illu_pos == 1 else "SELL"
         lines = [
             LINE,
-            f'📊 <b>STATUS {esc(self.name)}: {emoji} {self.trend}</b>',
+            f'📊 <b>{esc(self.name)} STATUS: {emoji} {TREND_EN[self.trend]}</b>',
             f'<a href="{url}">{esc(self.name)}</a> {fmt_index(self.close)}{chg} · '
-            f'{"di atas" if self.above_ema50 else "di bawah"} EMA50',
+            f'{"above" if self.above_ema50 else "below"} EMA50',
             self._regime_line(),
-            f"Illu Trx D: <b>{illu}</b> sejak {tgl(self.illu_since)} · "
+            f"Illu Trx D: <b>{illu}</b> since {tgl(self.illu_since)} · "
             f"Meter D: <b>{self.meter_d}</b> · W: <b>{self.meter_w}</b>",
-            f"Sinyal {self.window_days} hari bursa: 🔴 SELL {len(self.sells)}× · 🟢 BUY {len(self.buys)}×",
+            f"Signals in last {self.window_days} trading days: 🔴 SELL {len(self.sells)}× · "
+            f"🟢 BUY {len(self.buys)}×",
         ]
         if self.sells and not self.warning:
             left = self.min_events - len(self.sells)
-            lines.append(f"⚠️ Sudah {len(self.sells)}× sinyal SELL — {left} lagi = peringatan keras")
+            lines.append(f"⚠️ {len(self.sells)}× SELL signal so far — {left} more triggers the 🚨 warning")
         if self.buy_confirm:
-            lines.append(f"✅ <b>Konfirmasi tren naik</b>: {len(self.buys)}× sinyal BUY di atas EMA200 yang naik")
+            lines.append(f"✅ <b>Uptrend confirmed</b>: {len(self.buys)}× BUY signals above a rising EMA200")
         lines.append(LINE)
         out = "\n".join(lines)
         if self.warning:  # versi ringkas; pesan lengkap dikirim terpisah 1x/hari
-            extra = " di bawah EMA200 yang turun" if self.regime == "DOWNTREND" else ""
-            out = (f"🚨🚨🚨 <b>PERINGATAN KERAS: {len(self.sells)}× sinyal SELL {esc(self.name)} "
-                   f"dalam {self.window_days} hari bursa{extra}</b> "
-                   f"(terakhir {tgl(self.sells[-1].time)}) "
-                   "— hati-hati BUY baru 🚨🚨🚨\n" + out)
+            extra = " below a falling EMA200" if self.regime == "DOWNTREND" else ""
+            out = (f"🚨🚨🚨 <b>STRONG WARNING: {len(self.sells)}× {esc(self.name)} SELL signals "
+                   f"in {self.window_days} trading days{extra}</b> "
+                   f"(latest {tgl(self.sells[-1].time)}) "
+                   "— be careful with new BUYs 🚨🚨🚨\n" + out)
         return out
 
     def warning_text(self):
         lines = [
-            "🚨🚨🚨 <b>PERINGATAN KERAS — " + esc(self.name) + "</b> 🚨🚨🚨",
-            f"<b>{len(self.sells)}× sinyal SELL dalam {self.window_days} hari bursa terakhir</b>",
+            "🚨🚨🚨 <b>STRONG WARNING — " + esc(self.name) + "</b> 🚨🚨🚨",
+            f"<b>{len(self.sells)}× SELL signals in the last {self.window_days} trading days</b>",
             *[f"• {e.label()}" for e in self.sells],
             self._regime_line(),
         ]
         if self.regime == "DOWNTREND":
-            lines.append("‼️ Kumpulan sinyal SELL di bawah EMA200 yang turun — pada chart IHSG 2026 pola ini "
-                         "berulang kali diikuti penurunan lanjutan.")
-        lines.append("‼️ Tekanan jual pasar kuat. Pertimbangkan menahan BUY baru, "
-                     "memperketat stop, atau mengurangi posisi.")
+            lines.append("‼️ Cluster of SELL signals below a falling EMA200 — on the 2026 IHSG chart this "
+                         "pattern was repeatedly followed by further declines.")
+        lines.append("‼️ Strong selling pressure. Consider holding off on new BUYs, "
+                     "tightening stops, or reducing positions.")
         return "\n".join(lines)
 
 

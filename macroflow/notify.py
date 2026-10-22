@@ -13,19 +13,20 @@ TITLE = {
     "ROYAL": "👑 ROYAL (H4+D+W+Vol)",
     "COMBO": "🔷 COMBO (Illu+EMA50+MACD+RSI)",
     "GOLDEN": "🌟 GOLDEN SETUP (MA200+Stoch)",
-    "STANDAR": "📍 STANDAR (Illu Trx)",
+    "STANDAR": "📍 STANDARD (Illu Trx)",
     "METER": "📶 METER STRONG",
 }
 SHORT = {"ROYAL": "👑ROYAL", "COMBO": "🔷COMBO", "GOLDEN": "🌟GOLDEN",
-         "STANDAR": "📍STANDAR", "METER": "📶STRONG"}
-LEGEND = ("<i>👑ROYAL=H4+D+W+Vol · 🔷COMBO=Illu+EMA50+MACD+RSI · 📍STANDAR=Illu Trx · "
-          "📶STRONG=Meter STRONG · 🌟GOLDEN=MA200+Stoch</i>")
+         "STANDAR": "📍STANDARD", "METER": "📶STRONG"}
+LEGEND = ("<i>👑ROYAL = H4+D+W meters + volume · 🔷COMBO = Illu Trx + EMA50 + MACD + RSI · "
+          "📍STANDARD = Illu Trx reversal · 📶STRONG = Meter STRONG BUY/SELL · 🌟GOLDEN = MA200 + Stoch · "
+          "Prices: regular candles, signals: Heikin Ashi</i>")
 
 
 def fmt_price(x):
     if x is None or (isinstance(x, float) and np.isnan(x)):
         return "-"
-    return f"{x:,.0f}".replace(",", ".")
+    return f"{x:,.0f}"
 
 
 # kode khusus (mis. indeks) -> simbol TradingView; diisi dari config
@@ -88,7 +89,7 @@ def build_messages(header, items, footer="", show_time=False):
     for idx in TV_SYMBOLS:
         rows = [m for m in merged if m[0] == idx]
         if rows:
-            lines = [f"📊 <b>Sinyal {esc(idx)}</b>"]
+            lines = [f"📊 <b>{esc(idx)} signals</b>"]
             for t, side, bt, sigs in sorted(rows, key=lambda m: (m[1] != "BUY", m[2])):
                 emoji = "🟢" if side == "BUY" else "🔴"
                 lines.append(f"{emoji} {side} · " + _merged_line(t, sigs, show_time))
@@ -103,7 +104,7 @@ def build_messages(header, items, footer="", show_time=False):
         rows = sorted((m for m in merged if m[1] == side), key=key)
         if not rows:
             continue
-        lines = [f"{emoji} <b>{side}</b> — {len({m[0] for m in rows})} saham"]
+        lines = [f"{emoji} <b>{side}</b> — {len({m[0] for m in rows})} stocks"]
         lines += [_merged_line(t, sigs, show_time) for t, _, _, sigs in rows]
         blocks.append("\n".join(lines))
     if not blocks:
@@ -114,7 +115,7 @@ def build_messages(header, items, footer="", show_time=False):
 
 def split_messages(header, blocks, footer="", limit=3900):
     # pesan lanjutan cukup memakai baris pertama header (tanpa blok status)
-    cont = header.split("\n")[0] + " (lanjutan)"
+    cont = header.split("\n")[0] + " (continued)"
     msgs, cur = [], header
     for b in blocks:
         for piece in _split_block(b, limit - len(cont) - 10):

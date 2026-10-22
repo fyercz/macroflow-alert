@@ -88,15 +88,15 @@ def rules(df, window=5):
     """(nama aturan, arah yang diharapkan, mask hari aktif)"""
     R = []
     dn, upt = df["Rezim"] == "DOWNTREND", df["Rezim"] == "UPTREND"
-    R.append((f"STRONG SELL ≥2× dalam {window} hari (D+W)", "turun", df.SELL_strong >= 2))
-    R.append((f"Semua SELL ≥2 candle dalam {window} hari (D+W) — aturan aktif", "turun", df.SELL_semua >= 2))
-    R.append((f"Semua SELL ≥3 candle dalam {window} hari (D+W)", "turun", df.SELL_semua >= 3))
-    R.append((f"Semua SELL ≥2 candle dalam {window} hari (Daily saja)", "turun", df.SELL_semuaD >= 2))
-    R.append(("Aturan aktif + DOWNTREND", "turun", (df.SELL_semua >= 2) & dn))
-    R.append(("DOWNTREND (rezim saja)", "turun", dn))
-    R.append(("UPTREND (rezim saja)", "naik", upt))
-    R.append((f"Semua BUY ≥2 candle dalam {window} hari (D+W)", "naik", df.BUY_semua >= 2))
-    R.append(("BUY ≥2 (D+W) + UPTREND — konfirmasi tren naik", "naik", (df.BUY_semua >= 2) & upt))
+    R.append((f"STRONG SELL ≥2× in {window} days (D+W)", "turun", df.SELL_strong >= 2))
+    R.append((f"Any SELL on ≥2 candles in {window} days (D+W) — active rule", "turun", df.SELL_semua >= 2))
+    R.append((f"Any SELL on ≥3 candles in {window} days (D+W)", "turun", df.SELL_semua >= 3))
+    R.append((f"Any SELL on ≥2 candles in {window} days (Daily only)", "turun", df.SELL_semuaD >= 2))
+    R.append(("Active rule + DOWNTREND", "turun", (df.SELL_semua >= 2) & dn))
+    R.append(("DOWNTREND (regime only)", "turun", dn))
+    R.append(("UPTREND (regime only)", "naik", upt))
+    R.append((f"Any BUY on ≥2 candles in {window} days (D+W)", "naik", df.BUY_semua >= 2))
+    R.append(("BUY ≥2 (D+W) + UPTREND — uptrend confirmation", "naik", (df.BUY_semua >= 2) & upt))
     return R
 
 
@@ -196,24 +196,27 @@ def write_excel(out, summary, regime_tbl, eps, df):
 
 
 def telegram_text(summary, regime_tbl):
-    lines = ["🔬 <b>STUDI POLA IHSG</b>",
-             "<i>Episode = hari pertama aturan aktif. Bandingkan dengan rata-rata semua hari.</i>"]
+    REG = {"TRANSISI": "TRANSITION"}
+    lines = ["🔬 <b>IHSG PATTERN STUDY</b>",
+             "<i>Episode = first day a rule becomes active. Compare with the average of all days.</i>"]
     for _, r in summary.iterrows():
         k = "Rata2 ret 10h % (episode)"
         b = "Rata2 ret 10h % (semua hari)"
         if not r["Episode"]:
-            lines.append(f"\n<b>{r['Aturan']}</b>: tidak pernah aktif")
+            lines.append(f"\n<b>{r['Aturan']}</b>: never active")
             continue
         lines.append(
-            f"\n<b>{r['Aturan']}</b>\n{r['Episode']} episode · arah benar 10h {r['Arah benar 10h %']:.0f}% · "
-            f"ret 10h {r[k]:+.1f}% (normal {r[b]:+.1f}%) · turun ≥5% dlm 20h: "
-            f"{r['Turun ≥5% dalam 20h (%)']:.0f}% (normal {r['Baseline turun ≥5% dalam 20h (%)']:.0f}%)")
+            f"\n<b>{r['Aturan']}</b>\n{r['Episode']} episodes · right direction after 10d "
+            f"{r['Arah benar 10h %']:.0f}% · 10d return {r[k]:+.1f}% (normal {r[b]:+.1f}%) · "
+            f"fell ≥5% within 20d: {r['Turun ≥5% dalam 20h (%)']:.0f}% "
+            f"(normal {r['Baseline turun ≥5% dalam 20h (%)']:.0f}%)")
     if len(regime_tbl):
-        lines.append("\n<b>Sinyal IHSG per rezim</b> (arah benar 10 hari bursa)")
+        lines.append("\n<b>IHSG signals by regime</b> (right direction after 10 trading days)")
         for _, r in regime_tbl.iterrows():
-            lines.append(f"• {r['TF']} {r['Arah sinyal']} saat {r['Rezim']}: {r['Jumlah']}× · "
-                         f"benar {r['Arah benar 10h %']:.0f}% · ret 10h {r['Rata2 ret 10h %']:+.1f}%")
-    lines.append("\nDetail: file Excel <b>ihsg-study</b> di halaman run GitHub.")
+            lines.append(f"• {r['TF']} {r['Arah sinyal']} in {REG.get(r['Rezim'], r['Rezim'])}: "
+                         f"{r['Jumlah']}× · right {r['Arah benar 10h %']:.0f}% · "
+                         f"10d return {r['Rata2 ret 10h %']:+.1f}%")
+    lines.append("\nDetails: Excel file <b>ihsg-study</b> on the GitHub run page.")
     return "\n".join(lines)
 
 

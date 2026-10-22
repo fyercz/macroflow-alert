@@ -200,8 +200,8 @@ def run_modes(modes, cfg, now, tg, state):
 
         if mode == "daily-preclose":
             state.d["preclose"][day_str] = [sig_key(t, "D", s) for t, s in found]
-            header = (f"⏳ <b>SINYAL SEMENTARA — Daily</b>\n{now:%a %d %b %Y, %H:%M} WIB\n"
-                      "<i>Candle belum close, bisa berubah sampai penutupan.</i>" + status_txt)
+            header = (f"⏳ <b>PRELIMINARY SIGNALS — Daily</b>\n{now:%a %b %d, %Y %H:%M} WIB\n"
+                      "<i>Candle not closed yet — may change until the close.</i>" + status_txt)
             msgs = notify.build_messages(header, found)
         elif mode == "daily-final":
             new = [(t, s) for t, s in found if not state.seen(sig_key(t, "D", s))]
@@ -212,19 +212,20 @@ def run_modes(modes, cfg, now, tg, state):
                 state.mark(sig_key(t, "D", s), day_str)
             footer = ""
             if batal:
-                rows = [f"• {k.split('|')[0]} {k.split('|')[2]} {k.split('|')[3]}" for k in batal]
-                footer = "❌ <b>Sinyal sementara yang BATAL</b>\n" + "\n".join(rows)
-            header = f"✅ <b>SINYAL FINAL — Daily</b>\n{now:%a %d %b %Y} (setelah close)" + status_txt
+                rows = [f"• {k.split('|')[0]} {k.split('|')[2].replace('STANDAR', 'STANDARD')} "
+                        f"{k.split('|')[3]}" for k in batal]
+                footer = "❌ <b>CANCELLED preliminary signals</b>\n" + "\n".join(rows)
+            header = f"✅ <b>FINAL SIGNALS — Daily</b>\n{now:%a %b %d, %Y} (after close)" + status_txt
             msgs = notify.build_messages(header, new, footer)
             if not msgs and footer:
-                msgs = [header + "\n\nTidak ada sinyal baru.\n\n" + footer]
+                msgs = [header + "\n\nNo new signals.\n\n" + footer]
         else:  # hourly
             new = [(t, s) for t, s in found if not state.seen(sig_key(t, "1H", s))]
             for t, s in new:
                 state.mark(sig_key(t, "1H", s), day_str)
             bars = sorted({s.bar_time for _, s in new})
             when = ", ".join(f"{b:%H:%M}" for b in bars)
-            header = f"🕐 <b>SINYAL 1H</b> — candle {when}\n{now:%a %d %b %Y}" + status_txt
+            header = f"🕐 <b>1H SIGNALS</b> — candle {when}\n{now:%a %b %d, %Y}" + status_txt
             msgs = notify.build_messages(header, new, show_time=len(bars) > 1)
 
         log.info("%s: %d sinyal, %d pesan", mode, len(found), len(msgs))
@@ -365,7 +366,7 @@ def cmd_ihsg_study(cfg, args, now):
     print(f"\nDetail: {out}")
     if args.telegram:
         notify.Telegram().send_all(notify.split_messages(
-            "🔬 <b>STUDI POLA IHSG</b>", [study.telegram_text(summary, reg).split("\n", 1)[1]]))
+            "🔬 <b>IHSG PATTERN STUDY</b>", [study.telegram_text(summary, reg).split("\n", 1)[1]]))
 
 
 def cmd_test_telegram():
@@ -398,7 +399,7 @@ def cmd_test_telegram():
 
     r = requests.post(f"{base}/sendMessage", timeout=30, json={
         "chat_id": chat,
-        "text": "✅ MacroFlow Alert terhubung. Notifikasi sinyal akan dikirim ke sini."}).json()
+        "text": "✅ MacroFlow Alert connected. Signal alerts will be sent here."}).json()
     if r.get("ok"):
         print(f"[3] Terkirim ke chat {chat}. Cek chat dengan @{me['result']['username']} di Telegram.")
         return True
