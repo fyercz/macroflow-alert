@@ -14,7 +14,7 @@ tickers: []
 index_alert:
   meter_ma: SMA                       # STRONG BUY/SELL: harga vs SMA50 (saham tetap EMA50)
   timeframes: [D, W]
-  signals: [COMBO, STANDAR, METER]    # METER = STRONG BUY / STRONG SELL
+  signals: [COMBO, STANDAR, METER, CHOCH, BOS, OB, FVG]   # METER = STRONG BUY / STRONG SELL; 4 terakhir = SMC
   indices:
     IHSG:  {yahoo: "^JKSE", tradingview: "IDX:COMPOSITE", name: "IHSG", market: IDX}
     SP500: {yahoo: "^GSPC", tradingview: "SP:SPX", name: "S&P 500", market: US}
@@ -28,16 +28,18 @@ filter:
   min_price: 50               # harga minimum (Rp)
 
 # Sinyal yang dikirim per timeframe & arah (hapus yang tidak perlu).
-# Pilihan: ROYAL, COMBO, GOLDEN (khusus BUY), STANDAR, METER.
+# Pilihan: ROYAL, COMBO, GOLDEN (khusus BUY), STANDAR, METER,
+#          SMC: CHOCH (pembalikan struktur), BOS (lanjutan struktur), OB (retest order block), FVG (fair value gap).
 # Bisa juga ditulis singkat untuk kedua arah, contoh:  D: [COMBO, METER]
 # Dasar pilihan saat ini: backtest 1 Apr–30 Sep 2026 (GOLDEN paling rugi; 1H BUY terbaik COMBO & METER).
+# SMC di 1H hanya CHOCH & OB (BOS & FVG di 1H sangat sering muncul) — tambahkan kalau mau.
 signals:
   D:
-    BUY:  [ROYAL, COMBO, STANDAR, METER]
-    SELL: [ROYAL, COMBO, STANDAR, METER]
+    BUY:  [ROYAL, COMBO, STANDAR, METER, CHOCH, BOS, OB, FVG]
+    SELL: [ROYAL, COMBO, STANDAR, METER, CHOCH, BOS, OB, FVG]
   1H:
-    BUY:  [COMBO, METER]
-    SELL: [ROYAL, COMBO, STANDAR, METER]
+    BUY:  [COMBO, METER, CHOCH, OB]
+    SELL: [ROYAL, COMBO, STANDAR, METER, CHOCH, OB]
 
 # Status IHSG di atas setiap notifikasi saham (arah, rezim EMA200, Illu Trx, Meter D & W) +
 # PERINGATAN KERAS bila IHSG mendapat sinyal SELL di beberapa candle berbeda dalam
@@ -51,6 +53,7 @@ market_warning:
 
 # Parameter indikator (sama dengan input Pine Script)
 params:
+  smc_swing: 5         # SMC: candle kiri/kanan untuk swing high/low (makin besar = struktur makin besar & jarang)
   heikin_ashi: true    # semua indikator dihitung dari candle Heikin Ashi (seperti chart HA di TradingView).
                        # Harga yang ditampilkan, SL/TP, dan backtest tetap memakai harga asli.
   ut_key: 2.0          # Illu Trx Key Value

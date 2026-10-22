@@ -12,6 +12,13 @@ Sinyal dikirim ke Telegram dan dijalankan otomatis gratis di GitHub Actions.
 | 🌟 GOLDEN SETUP | Close > EMA200 dan Stoch %K cross up %D saat %K < 30 |
 | 📍 STANDAR Buy/Sell | Illu Trx berbalik arah (Key 2, ATR 10) |
 | 📶 METER STRONG | Meter timeframe chart berubah menjadi STRONG BUY / STRONG SELL |
+| 🔄 SMC CHoCH | *Change of Character*: close menembus swing high/low terakhir **berlawanan** arah struktur sebelumnya (pembalikan) |
+| ⏩ SMC BOS | *Break of Structure*: close menembus swing high/low terakhir **searah** struktur (lanjutan tren) |
+| 🧱 SMC Order Block | Retest pertama zona demand (BUY) / supply (SELL) yang terbentuk saat BOS/CHoCH. Zona ikut ditampilkan |
+| 🕳 SMC FVG | *Fair Value Gap* baru: celah 3 candle dengan candle tengah besar. Zona celah ikut ditampilkan |
+
+SMC dihitung tanpa repaint: swing high/low baru diakui setelah `smc_swing` candle (default 5) di kanannya,
+sama seperti `ta.pivothigh` di Pine. SMC memakai candle Heikin Ashi (sama dengan chart). Harga zona = skala Heikin Ashi.
 
 **Candle: Heikin Ashi.** Semua indikator (Illu Trx, EMA, RSI, MACD, Stoch, ADX, Meter) dihitung dari candle
 Heikin Ashi, sama seperti indikator di chart Heikin Ashi TradingView. Timeframe tinggi (H4, Daily, Weekly) disusun
@@ -28,8 +35,9 @@ SL = close − 2×ATR14, TP1 = 2R, TP2 = 3R (dibulatkan ke fraksi harga BEI). Si
 
 | Timeframe | BUY | SELL |
 |---|---|---|
-| Daily | ROYAL, COMBO, STANDAR, METER | ROYAL, COMBO, STANDAR, METER |
-| 1H | COMBO, METER | ROYAL, COMBO, STANDAR, METER |
+| Daily | ROYAL, COMBO, STANDAR, METER, CHoCH, BOS, OB, FVG | ROYAL, COMBO, STANDAR, METER, CHoCH, BOS, OB, FVG |
+| 1H | COMBO, METER, CHoCH, OB | ROYAL, COMBO, STANDAR, METER, CHoCH, OB |
+| Indeks (D & W) | COMBO, STANDAR, METER, CHoCH, BOS, OB, FVG | sama |
 
 GOLDEN dimatikan (hasil backtest paling jelek). Kalau satu saham mendapat beberapa sinyal di candle yang sama,
 semuanya digabung jadi satu baris, misalnya `🔷COMBO + 📶STRONG`. Saham dengan sinyal terbanyak tampil paling atas.

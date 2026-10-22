@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from . import indicators as ta
-from .notify import SHORT, TV_SYMBOLS, esc
+from .notify import ORDER, SHORT, TV_SYMBOLS, esc
 from .signals import Params, candles, evaluate, meter
 
 HARI = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -108,7 +108,7 @@ def signal_events(daily, weekly, p: Params, since, side="SELL", names=DEFAULT_SI
                 groups.setdefault(s.bar_time, []).append(s.name)
         for t, ns in groups.items():
             partial = bool(tf == "D" and final_upto is not None and t > final_upto)
-            ns = sorted(set(ns), key=["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER"].index)
+            ns = sorted(set(ns), key=ORDER.index)
             out.append(Event(time=t, tf=tf, side=side, names=ns, partial=partial))
     # urutkan waktu; untuk tanggal yang sama, Weekly sesudah Daily
     out.sort(key=lambda e: (e.time, e.tf == "W"))

@@ -122,7 +122,7 @@ def market_open_today(hourly, today):
     return any((df.index >= today).any() for df in list(hourly.values())[:20])
 
 
-ALL_SIGNALS = ["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER"]
+ALL_SIGNALS = ["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER", "CHOCH", "BOS", "OB", "FVG"]
 
 
 def enabled(cfg, tf):
@@ -315,7 +315,8 @@ def cmd_check(cfg, ticker, tf, bars):
         mm = (f"  SL {s.info['sl']:,.0f}  TP1 {s.info['tp1']:,.0f}  TP2 {s.info['tp2']:,.0f}"
               if "sl" in s.info and not is_index else f"  stop Illu {s.info['stop']:,.2f}")
         when = f"{s.bar_time:%Y-%m-%d %H:%M}" if tf == "1H" else f"{s.bar_time:%Y-%m-%d}"
-        print(f"{when}  {s.name:8s} {s.side:4s}  close {s.close:,.2f}{mm}")
+        zone = (f"  zone {s.info['zone'][0]:,.2f}–{s.info['zone'][1]:,.2f}" if s.info.get("zone") else "")
+        print(f"{when}  {s.name:8s} {s.side:4s}  close {s.close:,.2f}{mm}{zone}")
     if not sigs:
         print("(tidak ada sinyal)")
 

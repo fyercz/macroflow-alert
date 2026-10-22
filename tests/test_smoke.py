@@ -251,7 +251,8 @@ def test_enabled_config():
     cfg = yaml.safe_load((Path(main.ROOT) / "config.yaml").read_text())
     d, h = main.enabled(cfg, "D"), main.enabled(cfg, "1H")
     assert not any(n == "GOLDEN" for n, _ in d | h), "GOLDEN harus mati"
-    assert {n for n, side in h if side == "BUY"} == {"COMBO", "METER"}
+    assert {n for n, side in h if side == "BUY"} == {"COMBO", "METER", "CHOCH", "OB"}
+    assert {"CHOCH", "BOS", "OB", "FVG"} <= {n for n, _ in d}
     assert ("ROYAL", "SELL") in h and ("ROYAL", "BUY") in d
     assert main.enabled({"signals": {"D": ["COMBO"]}}, "D") == {("COMBO", "BUY"), ("COMBO", "SELL")}
     from macroflow.signals import Signal
@@ -475,6 +476,75 @@ def test_alerts_in_english():
                       r"terakhir|lanjutan|sementara|batal|di atas|di bawah|rezim|bursa|STANDAR)\b", re.I)
     for t in texts:
         assert not indo.search(t), indo.search(t).group(0)
+
+
+def _zigzag(points, steps=6):
+    """Harga zigzag lewat titik-titik: candle naik/turun bertahap, tanpa noise."""
+    c = []
+    for a, b in zip(points[:-1], points[1:]):
+        c += list(np.linspace(a, b, steps + 1)[1:])
+    c = np.array([points[0]] + c, float)
+    o = np.concatenate([[c[0]], c[:-1]])
+    return o, np.maximum(o, c) + 0.2, np.minimum(o, c) - 0.2, c
+
+
+def test_smc_structure():
+    from macroflow import smc
+    # naik dengan swing makin tinggi (BOS bullish), lalu jatuh tembus swing low (CHoCH bearish)
+    o, h, l, c = _zigzag([100, 110, 104, 116, 108, 124, 115, 128, 118, 95, 105, 90], steps=6)
+    r = smc.detect(o, h, l, c, swing=3)
+    assert r.bos_buy.sum() >= 2, "struktur naik harus menghasilkan BOS bullish"
+    first_sell = np.argmax(r.choch_sell)
+    assert r.choch_sell.any() and not r.bos_sell[:first_sell].any(), "patahan pertama ke bawah = CHoCH"
+    assert all(np.argmax(r.bos_buy) < first_sell for _ in [0])
+    # setelah CHoCH bearish, patahan bawah berikutnya = BOS bearish
+    assert r.bos_sell[first_sell + 1:].any()
+    # tidak ada BUY & SELL struktur di candle yang sama
+    assert not (r.bos_buy & r.bos_sell).any() and not (r.choch_buy & r.choch_sell).any()
+
+
+def test_smc_no_repaint():
+    """Sinyal SMC di candle i tidak berubah kalau data sesudah i ditambahkan."""
+    from macroflow import smc
+    d = ta.heikin_ashi(DAILY["BBBB"])
+    o, h, l, c = (d[k].to_numpy(float) for k in ("Open", "High", "Low", "Close"))
+    full = smc.detect(o, h, l, c, 5)
+    for cut in (150, 200, 240):
+        part = smc.detect(o[:cut], h[:cut], l[:cut], c[:cut], 5)
+        for name in ("choch_buy", "choch_sell", "bos_buy", "bos_sell", "ob_buy", "ob_sell",
+                     "fvg_buy", "fvg_sell"):
+            assert (getattr(part, name) == getattr(full, name)[:cut]).all(), name
+
+
+def test_smc_fvg_and_ob():
+    from macroflow import smc
+    # FVG bullish: candle 1 sangat besar sehingga low candle 2 > high candle 0
+    n = 40
+    c = np.full(n, 100.0); o = c.copy(); h = c + 0.5; l = c - 0.5
+    o[30], c[30], h[30], l[30] = 100, 110, 110.5, 99.8
+    o[31], c[31], h[31], l[31] = 110, 111, 111.5, 109
+    r = smc.detect(o, h, l, c, swing=3)
+    assert r.fvg_buy[31] and r.zones[("FVG", "BUY", 31)] == (100.5, 109)
+    # OB: setelah BOS naik, harga kembali ke zona demand -> retest
+    o2, h2, l2, c2 = _zigzag([100, 110, 104, 116, 105, 124, 118, 130], steps=6)
+    r2 = smc.detect(o2, h2, l2, c2, swing=3)
+    assert r2.ob_buy.any()
+    j = int(np.argmax(r2.ob_buy))
+    lo, hi = r2.zones[("OB", "BUY", j)]
+    assert l2[j] <= hi and c2[j] >= lo
+
+
+def test_smc_in_messages():
+    from macroflow.signals import Signal
+    notify.TV_SYMBOLS.clear()
+    info = {"chg": 1.0, "rsi": 60, "vol_ratio": 2.0, "sl": 950, "tp1": 1100, "tp2": 1150}
+    items = [("AAAA", Signal("CHOCH", "BUY", TODAY, 1000.0, dict(info))),
+             ("AAAA", Signal("OB", "BUY", TODAY, 1000.0, dict(info, zone=(960.0, 985.0))))]
+    msg = "\n".join(notify.build_messages("H", items))
+    assert "🔄CHoCH + 🧱OB (OB zone 960–985)" in msg and "change of character" in msg
+    d, h = DAILY["BBBB"], HOURLY["BBBB"]
+    names = {s.name for s in evaluate(h, d, h, "1H", Params(), last_n=len(h) - 1)}
+    assert {"CHOCH", "BOS", "OB"} <= names
 
 
 if __name__ == "__main__":

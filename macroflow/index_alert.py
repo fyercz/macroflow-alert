@@ -53,7 +53,7 @@ def index_params(cfg, base: Params):
 
 def settings(cfg):
     ia = cfg.get("index_alert") or {}
-    return (tuple(str(x).upper() for x in ia.get("signals", ["COMBO", "STANDAR", "METER"])),
+    return (tuple(str(x).upper() for x in ia.get("signals", ["COMBO", "STANDAR", "METER", "CHOCH", "BOS", "OB", "FVG"])),
             tuple(str(x).upper() for x in ia.get("timeframes", ["D", "W"])))
 
 
@@ -106,7 +106,7 @@ def fmt_signals(rows):
         emoji = "🟢" if side == "BUY" else "🔴"
         when = (f"Daily {market.tgl(bt)}" if tf == "D"
                 else f"<b>Weekly</b> week ending {market.tgl(bt)}")
-        names = " + ".join(SHORT[s.name] for s in sigs)
+        names = " + ".join(SHORT[s.name] for s in sigs) + notify.zone_text(sigs, market.fmt_index)
         extra = [f"close {market.fmt_index(s0.close)}"]
         if s0.info.get("chg") == s0.info.get("chg"):  # bukan NaN
             extra.append(f"{s0.info['chg']:+.1f}%")
@@ -172,6 +172,6 @@ def run(cfg, now, tg, state, mkt, base_params, market_kwargs):
                   f"<i>STRONG = Meter using {p.meter_ma}50</i>")
         legend = (f"<i>📶STRONG = Meter STRONG BUY/SELL (price vs {p.meter_ma}50 + RSI14 + ADX14) · "
                   "🔷COMBO = Illu Trx + EMA50 + MACD + RSI · 📍STANDARD = Illu Trx reversal · "
-                  "Signals from Heikin Ashi candles, prices are regular</i>")
+                  + notify.SMC_LEGEND + " · Signals & zones from Heikin Ashi candles, prices are regular</i>")
         tg.send_all(notify.split_messages(header, blocks + [legend]))
     state.save(now_naive.normalize())

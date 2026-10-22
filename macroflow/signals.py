@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from . import indicators as ta
+from . import smc as smc_mod
 
 OHLCV = ["Open", "High", "Low", "Close", "Volume"]
 
@@ -22,6 +23,7 @@ class Params:
     meter_thres: int = 20
     meter_ma: str = "EMA"      # MA untuk Meter STRONG: "EMA" (saham) atau "SMA" (alert indeks)
     heikin_ashi: bool = True   # indikator dihitung dari candle Heikin Ashi (seperti chart TradingView HA)
+    smc_swing: int = 5         # SMC: jumlah candle kiri/kanan untuk swing high/low
     atr_mult_sl: float = 2.0
 
 
@@ -121,7 +123,7 @@ def htf_scores(daily, hourly, cutoff, p: Params):
 # ----------------------------------------------------------------------
 @dataclass
 class Signal:
-    name: str          # ROYAL / COMBO / GOLDEN / STANDAR / METER
+    name: str          # ROYAL / COMBO / GOLDEN / STANDAR / METER / CHOCH / BOS / OB / FVG
     side: str          # BUY / SELL
     bar_time: pd.Timestamp
     close: float
@@ -171,6 +173,8 @@ def evaluate(chart, daily, hourly, tf, p: Params, last_n=1):
     meter_buy = (mtxt == "STRONG BUY") & (mtxt_prev != "STRONG BUY")
     meter_sell = (mtxt == "STRONG SELL") & (mtxt_prev != "STRONG SELL")
 
+    sm = smc_mod.detect(o, h, l, c, p.smc_swing)
+
     vol_ok_buy = (v > vol_sma) & (c > o)
     vol_ok_sell = (v > vol_sma) & (c < o)
 
@@ -206,10 +210,20 @@ def evaluate(chart, daily, hourly, tf, p: Params, last_n=1):
             ("STANDAR", "SELL", std_sell[i]),
             ("METER", "BUY", meter_buy[i]),
             ("METER", "SELL", meter_sell[i]),
+            ("CHOCH", "BUY", sm.choch_buy[i]),
+            ("CHOCH", "SELL", sm.choch_sell[i]),
+            ("BOS", "BUY", sm.bos_buy[i]),
+            ("BOS", "SELL", sm.bos_sell[i]),
+            ("OB", "BUY", sm.ob_buy[i]),
+            ("OB", "SELL", sm.ob_sell[i]),
+            ("FVG", "BUY", sm.fvg_buy[i]),
+            ("FVG", "SELL", sm.fvg_sell[i]),
         ]
         for name, side, hit in checks:
             if hit:
                 sig = Signal(name, side, t, rc[i], dict(info))
+                if (name, side, i) in sm.zones:  # zona OB / FVG (skala candle indikator)
+                    sig.info["zone"] = sm.zones[(name, side, i)]
                 if side == "BUY":
                     sig.info.update(sl_tp(rc[i], atr14[i], p))
                 out.append(sig)

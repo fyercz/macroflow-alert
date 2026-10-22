@@ -24,6 +24,13 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
   "STANDARD" (internal tetap `STANDAR`), tren UP/DOWN/MIXED & rezim TRANSITION via `market.TREND_EN/REGIME_EN`
   (nilai internal NAIK/TURUN/CAMPURAN/TRANSISI). Angka format Inggris (1,273 · 6,712.45), tanggal "Fri Oct 16".
   Tes `test_alerts_in_english` menjaga ini. Chat dengan pengguna tetap Bahasa Indonesia; Excel/console boleh Indonesia.
+- **SMC** (pengguna 23 Okt 2026: "sinyal SMC baru", komponen BOS/CHoCH, Order Block, FVG; saham & indeks):
+  `macroflow/smc.py` `detect(o,h,l,c,swing)` di candle HA, non-repaint (pivot dikonfirmasi `smc_swing`=5 bar kemudian;
+  tes `test_smc_no_repaint`). Nama sinyal CHOCH/BOS/OB/FVG di `evaluate()`; OB = retest pertama zona (candle low
+  terendah/high tertinggi antara pivot & candle penembus), batal bila close tembus sisi seberang, maks 5 zona/sisi;
+  FVG = celah 3 candle + body tengah > 2× rata-rata kumulatif |body%|. `info["zone"]` (skala HA) tampil di pesan.
+  Aktif: D semua 4, 1H hanya CHOCH & OB (BOS/FVG 1H terlalu sering), indeks D&W semua 4. **Belum di-backtest.**
+  Peringatan keras IHSG tetap hanya COMBO/STANDAR/METER.
 - **Universe**: semua saham IDX (daftar dari screener TradingView, cache `tickers.txt` 7 hari),
   difilter likuiditas: rata-rata nilai transaksi 20 hari ≥ Rp 2 M, harga ≥ 50.
 - **Tanpa scanner/tabel/fibo** dari Pine — hanya sinyal.
@@ -70,6 +77,7 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 | `macroflow/data.py` | Daftar saham (TradingView scanner), download Yahoo per 80 ticker, `YAHOO_SYMBOLS` untuk indeks |
 | `macroflow/notify.py` | Format HTML Telegram, `merge_signals()` gabung sinyal ganda, split 3900 char, `TV_SYMBOLS` untuk indeks |
 | `macroflow/market.py` | `regime()`, `weekly_bars()`, `closed_weeks()`, `signal_events()` (1 Event per candle, D/W), `ihsg_status(daily, now, p, ..., final_upto)` → `MarketStatus`, `fmt_index()` (6,712.45) |
+| `macroflow/smc.py` | SMC: `detect()` → `SMC` (choch/bos/ob/fvg buy/sell arrays + `zones`) |
 | `macroflow/index_alert.py` | Alert indeks D & W: `specs/register/index_params/final_upto/index_signals/run` |
 | `macroflow/study.py` | `ihsg-study`: per hari as-of close hitung kumpulan sinyal (D+W, Meter SMA) & rezim, ret 5/10/20h ke depan, episode, Excel 5 sheet + teks Telegram. IHSG D 10y |
 | `macroflow/main.py` | CLI: `auto`, `run <mode>`, `check TICKER --tf D/1H/W` (indeks: SMA, D/W saja), `backtest --start [--end] [--tf D 1H]` (tanggal divalidasi, exit 1 kalau salah), `ihsg-study [--telegram]`, `test-telegram` (diagnostik 3 langkah, exit 1 kalau gagal), `chat-id` |
@@ -106,7 +114,7 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 ## Status terakhir (19 Okt 2026)
 
-- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (22 tes, ±25 detik, jalan tanpa pytest:
+- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (26 tes, ±30 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
 - Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:
