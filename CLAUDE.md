@@ -140,6 +140,14 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
   peringatan keras STRONG SELL ≥2× dalam 5 hari bursa. Belum: filter BUY otomatis berdasarkan IHSG (sengaja tidak,
   backtest hanya membantu sedikit). Pengguna dianjurkan memperlakukan sinyal sebagai watchlist.
 
+- Backtest ketiga **1 Apr–30 Sep 2026, Daily saja, Heikin Ashi + SMC LuxAlgo** (295 saham, 11.297 sinyal ≈ 93/hari,
+  65 saham/hari). BUY (biaya 0,4%, exit TP1): CHOCH +0,09R, COMBO +0,08R, BOS +0,02, FVG +0,01, METER +0,01,
+  STANDAR −0,04, ROYAL −0,06, OB(breakout) −0,09. Konfluensi SMC+klasik di candle sama +0,07R vs klasik saja −0,07R;
+  CHoCH + COMBO/METER ("A+") +0,15R, 1,25/hari, tapi tetap rugi Apr & Sep (rezim pasar tetap dominan).
+  SELL benar 5 bar: STANDAR 60%, COMBO/METER 57%, BOS 55%, OB 54%, CHOCH 53%, ROYAL 51%, FVG 47% (terburuk).
+  RSI>70 BUY terbaik lagi. Usulan (menunggu pengguna): matikan ROYAL (BUY & SELL), OB BUY, FVG SELL di Daily
+  (→ 65 sinyal/hari, BUY E ≈ 0), tandai setup A+ di pesan, tambah kolom lapis SMC (internal/swing) di Excel backtest.
+
 ## Ide lanjutan yang pernah ditawarkan (belum dikerjakan)
 
 - Input tanggal backtest `5d` = 5 hari bursa terakhir otomatis.
