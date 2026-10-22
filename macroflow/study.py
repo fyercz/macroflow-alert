@@ -15,7 +15,7 @@ import pandas as pd
 
 from . import data, indicators as ta
 from .market import SLOPE_BARS, closed_weeks, regime, weekly_bars
-from .signals import evaluate
+from .signals import candles, evaluate
 
 log = logging.getLogger("macroflow.study")
 ALL = ("COMBO", "STANDAR", "METER")
@@ -46,12 +46,13 @@ def _day_counts(sig, days, side, names, tfs):
 def build_daily(d, p, window=5, now=None):
     """Tabel harian: close, rezim, return ke depan, dan hitungan sinyal untuk berbagai aturan."""
     days = d.index
-    c = d["Close"].to_numpy(float)
+    c = d["Close"].to_numpy(float)       # harga asli: untuk return ke depan
     lo = d["Low"].to_numpy(float)
     hi = d["High"].to_numpy(float)
-    e200 = ta.ema(c, 200)
+    hc = candles(d, p)["Close"].to_numpy(float)  # rezim dari candle yang dipakai indikator (HA)
+    e200 = ta.ema(hc, 200)
     prev = np.concatenate([np.full(SLOPE_BARS, np.nan), e200[:-SLOPE_BARS]])
-    reg = [regime(c[i], e200[i], prev[i]) if not np.isnan(prev[i]) else None for i in range(len(c))]
+    reg = [regime(hc[i], e200[i], prev[i]) if not np.isnan(prev[i]) else None for i in range(len(c))]
 
     sig = _signals(d, d, "D", p)
     now = d.index[-1] + pd.Timedelta(days=1) if now is None else now

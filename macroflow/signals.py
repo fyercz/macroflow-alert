@@ -21,6 +21,7 @@ class Params:
     meter_adx: int = 14
     meter_thres: int = 20
     meter_ma: str = "EMA"      # MA untuk Meter STRONG: "EMA" (saham) atau "SMA" (alert indeks)
+    heikin_ashi: bool = True   # indikator dihitung dari candle Heikin Ashi (seperti chart TradingView HA)
     atr_mult_sl: float = 2.0
 
 
@@ -67,7 +68,19 @@ def daily_upto(daily, hourly, cutoff):
 # ----------------------------------------------------------------------
 # Meter (f_get_meter_data)
 # ----------------------------------------------------------------------
+def candles(df, p: Params):
+    """OHLC yang dipakai indikator: Heikin Ashi (default) atau candle biasa.
+
+    Input SELALU candle biasa (harga asli); konversi HA dilakukan di sini, termasuk untuk
+    timeframe tinggi (H4/D/W disusun dari candle biasa, lalu dijadikan HA — sama dengan
+    request.security di chart Heikin Ashi TradingView).
+    """
+    return ta.heikin_ashi(df) if p.heikin_ashi else df
+
+
 def meter(df, p: Params):
+    """df = candle biasa (dikonversi ke HA sesuai setelan)."""
+    df = candles(df, p)
     c, h, l = (df[k].to_numpy(float) for k in ("Close", "High", "Low"))
     ma = ta.sma if str(p.meter_ma).upper() == "SMA" else ta.ema
     e = ma(c, p.meter_ema)
@@ -126,7 +139,10 @@ def evaluate(chart, daily, hourly, tf, p: Params, last_n=1):
     n = len(chart)
     if n < 30:
         return []
-    o, h, l, c, v = (chart[k].to_numpy(float) for k in OHLCV)
+    # indikator dari candle Heikin Ashi; harga yang ditampilkan & SL/TP dari harga asli
+    src = candles(chart, p)
+    o, h, l, c, v = (src[k].to_numpy(float) for k in OHLCV)
+    rc, rh, rl = (chart[k].to_numpy(float) for k in ("Close", "High", "Low"))
 
     ema50 = ta.ema(c, 50)
     ema200 = ta.ema(c, 200)
@@ -136,7 +152,7 @@ def evaluate(chart, daily, hourly, tf, p: Params, last_n=1):
     d = ta.sma(k, p.stoch_d)
     stop, pos = ta.illu_trx(c, h, l, p.ut_key, p.ut_period)
     vol_sma = ta.sma(v, 20)
-    atr14 = ta.atr(h, l, c, 14)
+    atr14 = ta.atr(rh, rl, rc, 14)  # untuk SL: ATR dari harga asli
 
     pos_prev = np.concatenate([[0], pos[:-1]])
     std_buy = (pos == 1) & (pos_prev == -1)
@@ -176,7 +192,7 @@ def evaluate(chart, daily, hourly, tf, p: Params, last_n=1):
         info = {
             "stop": stop[i], "rsi": rsi14[i],
             "vol_ratio": v[i] / vol_sma[i] if vol_sma[i] else np.nan,
-            "chg": (c[i] / c[i - 1] - 1) * 100 if c[i - 1] else np.nan,
+            "chg": (rc[i] / rc[i - 1] - 1) * 100 if rc[i - 1] else np.nan,
             "htf": scores.get(i),
         }
         t = chart.index[i]
@@ -193,9 +209,9 @@ def evaluate(chart, daily, hourly, tf, p: Params, last_n=1):
         ]
         for name, side, hit in checks:
             if hit:
-                sig = Signal(name, side, t, c[i], dict(info))
+                sig = Signal(name, side, t, rc[i], dict(info))
                 if side == "BUY":
-                    sig.info.update(sl_tp(c[i], atr14[i], p))
+                    sig.info.update(sl_tp(rc[i], atr14[i], p))
                 out.append(sig)
     return out
 

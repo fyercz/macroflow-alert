@@ -51,6 +51,8 @@ market_warning:
 
 # Parameter indikator (sama dengan input Pine Script)
 params:
+  heikin_ashi: true    # semua indikator dihitung dari candle Heikin Ashi (seperti chart HA di TradingView).
+                       # Harga yang ditampilkan, SL/TP, dan backtest tetap memakai harga asli.
   ut_key: 2.0          # Illu Trx Key Value
   ut_period: 10        # Illu Trx ATR Period
   stoch_k: 14

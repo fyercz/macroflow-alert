@@ -52,7 +52,10 @@ def params_from(cfg):
     p = Params()
     for k, v in (cfg.get("params") or {}).items():
         if hasattr(p, k):
-            setattr(p, k, type(getattr(p, k))(v))
+            cur = getattr(p, k)
+            if isinstance(cur, bool):  # bool("false") == True, jadi ditangani khusus
+                v = v if isinstance(v, bool) else str(v).strip().lower() in ("1", "true", "yes", "ya")
+            setattr(p, k, type(cur)(v))
     return p
 
 

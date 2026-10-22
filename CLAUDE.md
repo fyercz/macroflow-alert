@@ -14,6 +14,11 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 
 ## Keputusan yang sudah disepakati (jangan diubah tanpa ditanya)
 
+- **Candle Heikin Ashi** (pengguna, 23 Okt 2026: "indikatornya didesain menggunakan heikin ashi"): `Params.heikin_ashi=True`.
+  `signals.candles()` mengubah OHLC asli → HA; `meter()` & `evaluate()` SELALU menerima candle asli lalu konversi sendiri
+  (jangan kirim HA ke keduanya — dobel konversi). HTF (H4/D/W) disusun dari candle asli lalu HA (seperti request.security
+  di chart HA). Harga tampil, chg, SL/TP (ATR asli), dan simulasi backtest = **harga asli**; "Stop Illu" = skala HA.
+  Status/rezim (market.py) & rezim study memakai HA close. Hasil backtest/ihsg-study sebelum 23 Okt = candle biasa (usang).
 - **Universe**: semua saham IDX (daftar dari screener TradingView, cache `tickers.txt` 7 hari),
   difilter likuiditas: rata-rata nilai transaksi 20 hari ≥ Rp 2 M, harga ≥ 50.
 - **Tanpa scanner/tabel/fibo** dari Pine — hanya sinyal.
@@ -55,7 +60,7 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 
 | File | Isi |
 |---|---|
-| `macroflow/indicators.py` | EMA/RMA (seed SMA seperti Pine), RSI, ATR, DMI/ADX, MACD, Stoch, crossover, `illu_trx` (UT Bot) — sudah dicocokkan dengan TA-Lib (selisih < 1e-12) |
+| `macroflow/indicators.py` | EMA/RMA (seed SMA seperti Pine), RSI, ATR, DMI/ADX, MACD, Stoch, crossover, `illu_trx` (UT Bot) — sudah dicocokkan dengan TA-Lib (selisih < 1e-12); `heikin_ashi()` |
 | `macroflow/signals.py` | Pembentukan H4 (09–13 & 13–17 WIB, pola TradingView IDX), D parsial, W; `meter()`; `evaluate()` → list `Signal`; `sl_tp()` |
 | `macroflow/data.py` | Daftar saham (TradingView scanner), download Yahoo per 80 ticker, `YAHOO_SYMBOLS` untuk indeks |
 | `macroflow/notify.py` | Format HTML Telegram, `merge_signals()` gabung sinyal ganda, split 3900 char, `TV_SYMBOLS` untuk indeks |
@@ -96,7 +101,7 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 ## Status terakhir (19 Okt 2026)
 
-- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (19 tes, ±30 detik, jalan tanpa pytest:
+- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (21 tes, ±25 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
 - Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:

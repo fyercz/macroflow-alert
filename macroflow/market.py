@@ -16,7 +16,7 @@ import pandas as pd
 
 from . import indicators as ta
 from .notify import SHORT, TV_SYMBOLS, esc
-from .signals import Params, evaluate, meter
+from .signals import Params, candles, evaluate, meter
 
 HARI = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
 BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
@@ -206,8 +206,10 @@ def ihsg_status(daily, now, p: Params, code="IHSG", window_days=5, min_events=2,
     if daily is None or len(daily) < 60:
         return None
     final_upto = daily.index[-1] if final_upto is None else final_upto
-    c = daily["Close"].to_numpy(float)
-    _, pos = ta.illu_trx(c, daily["High"].to_numpy(float), daily["Low"].to_numpy(float),
+    real_c = daily["Close"].to_numpy(float)          # harga asli untuk ditampilkan
+    src = candles(daily, p)                          # indikator dari Heikin Ashi (sesuai setelan)
+    c = src["Close"].to_numpy(float)
+    _, pos = ta.illu_trx(c, src["High"].to_numpy(float), src["Low"].to_numpy(float),
                          p.ut_key, p.ut_period)
     flips = np.where(pos != np.concatenate([[pos[0]], pos[:-1]]))[0]
     since = daily.index[flips[-1]] if len(flips) else daily.index[0]
@@ -233,8 +235,8 @@ def ihsg_status(daily, now, p: Params, code="IHSG", window_days=5, min_events=2,
     wk = closed_weeks(weekly, final_upto, now)
     kw = dict(names=signals, tfs=tuple(timeframes), final_upto=final_upto)
     return MarketStatus(
-        code=code, name=name or code, close=c[-1],
-        chg=(c[-1] / c[-2] - 1) * 100 if c[-2] else np.nan,
+        code=code, name=name or code, close=real_c[-1],
+        chg=(real_c[-1] / real_c[-2] - 1) * 100 if real_c[-2] else np.nan,
         trend=trend, regime=regime(c[-1], e200[-1], prev), ema200_slope=slope,
         illu_pos=int(pos[-1]), illu_since=since, meter_d=md, meter_w=str(mtxt_w[-1]),
         above_ema50=bool(c[-1] > ema50), above_ema200=bool(c[-1] > e200[-1]),

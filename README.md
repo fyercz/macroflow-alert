@@ -13,6 +13,12 @@ Sinyal dikirim ke Telegram dan dijalankan otomatis gratis di GitHub Actions.
 | 📍 STANDAR Buy/Sell | Illu Trx berbalik arah (Key 2, ATR 10) |
 | 📶 METER STRONG | Meter timeframe chart berubah menjadi STRONG BUY / STRONG SELL |
 
+**Candle: Heikin Ashi.** Semua indikator (Illu Trx, EMA, RSI, MACD, Stoch, ADX, Meter) dihitung dari candle
+Heikin Ashi, sama seperti indikator di chart Heikin Ashi TradingView. Timeframe tinggi (H4, Daily, Weekly) disusun
+dari candle biasa lalu dijadikan Heikin Ashi, seperti `request.security` di chart HA. **Harga yang ditampilkan,
+% perubahan, SL/TP, dan perhitungan backtest tetap memakai harga asli** (harga Heikin Ashi bukan harga transaksi).
+Level "Stop Illu" mengikuti garis Illu Trx di chart HA. Bisa dimatikan dengan `params.heikin_ashi: false`.
+
 Setiap sinyal disertai harga, % perubahan, RSI, dan rasio volume. Sinyal BUY ditambah
 SL = close − 2×ATR14, TP1 = 2R, TP2 = 3R (dibulatkan ke fraksi harga BEI). Sinyal SELL ditambah level trailing stop Illu Trx.
 
@@ -138,7 +144,8 @@ python -m macroflow.main check BBCA --tf D --bars 120
 python -m macroflow.main check BBCA --tf 1H --bars 60
 ```
 
-Perintah ini menampilkan riwayat sinyal. Bandingkan dengan panah/label di chart TradingView.
+Perintah ini menampilkan riwayat sinyal. Bandingkan dengan panah/label di chart TradingView
+(gunakan chart **Heikin Ashi**; untuk IHSG/S&P 500 set Meter ke SMA50).
 
 Perbedaan kecil yang mungkin muncul:
 - **Sumber data**: Yahoo Finance, bukan feed IDX TradingView. Kadang ada selisih OHLC/volume kecil,

@@ -144,3 +144,25 @@ def illu_trx(close, high, low, key, period):
         else:
             pos[i] = p_prev
     return stop, pos
+
+
+def heikin_ashi(df):
+    """Candle Heikin Ashi seperti TradingView (OHLC baru, Volume tetap).
+
+    HA close = (O+H+L+C)/4 · HA open = (HA open + HA close) candle sebelumnya / 2
+    (candle pertama: (O+C)/2) · HA high = max(H, HA open, HA close) · HA low = min(L, HA open, HA close)
+    """
+    if df is None or not len(df):
+        return df
+    o, h, l, c = (df[k].to_numpy(float) for k in ("Open", "High", "Low", "Close"))
+    hc = (o + h + l + c) / 4.0
+    ho = np.empty(len(c))
+    ho[0] = (o[0] + c[0]) / 2.0
+    for i in range(1, len(c)):
+        ho[i] = (ho[i - 1] + hc[i - 1]) / 2.0
+    out = df.copy()
+    out["Open"] = ho
+    out["Close"] = hc
+    out["High"] = np.maximum(h, np.maximum(ho, hc))
+    out["Low"] = np.minimum(l, np.minimum(ho, hc))
+    return out

@@ -78,7 +78,7 @@ CFG = {
 }
 
 
-def make_crash_index(seed=99, amp=0.05, drop=0.20, k=30):
+def make_crash_index(seed=99, amp=0.12, drop=0.20, k=60):
     """Indeks naik stabil lalu crash bergelombang di 5 hari terakhir (STRONG SELL berulang)."""
     h = make_hourly(seed, 7000)
     n = len(h)
@@ -433,6 +433,30 @@ def test_index_alert_messages_format():
     lines = index_alert.fmt_signals(rows)
     assert len(lines) == 2 and "🔷COMBO + 📶STRONG" in lines[0] and "Weekly" in lines[1]
     assert "6.712,45" in lines[0]
+
+
+def test_heikin_ashi():
+    df = pd.DataFrame({"Open": [10.0, 12.0, 11.0], "High": [13.0, 14.0, 12.0],
+                       "Low": [9.0, 11.0, 8.0], "Close": [12.0, 13.0, 9.0], "Volume": [1, 2, 3]})
+    ha = ta.heikin_ashi(df)
+    assert ha["Close"].tolist() == [11.0, 12.5, 10.0]          # (O+H+L+C)/4
+    assert ha["Open"].tolist() == [11.0, 11.0, 11.75]          # (O+C)/2, lalu rata2 HA sebelumnya
+    assert ha["High"].tolist() == [13.0, 14.0, 12.0] and ha["Low"].tolist() == [9.0, 11.0, 8.0]
+    assert ha["Volume"].tolist() == [1, 2, 3] and df["Close"].tolist() == [12.0, 13.0, 9.0]
+
+
+def test_signals_use_heikin_ashi_but_real_prices():
+    d, h = DAILY["AAAA"], HOURLY["AAAA"]
+    ha = evaluate(d, d, h, "D", Params(), last_n=150)
+    plain = evaluate(d, d, h, "D", Params(heikin_ashi=False), last_n=150)
+    key = lambda sigs: {(s.name, s.side, s.bar_time) for s in sigs}
+    assert key(ha) != key(plain), "Heikin Ashi harus mengubah sinyal"
+    for s in ha:  # harga & SL/TP tetap dari harga asli
+        assert s.close == d.loc[s.bar_time, "Close"]
+        if "sl" in s.info:
+            assert s.info["sl"] < s.close
+    p = main.params_from({"params": {"heikin_ashi": "false"}})
+    assert p.heikin_ashi is False and main.params_from({}).heikin_ashi is True
 
 
 if __name__ == "__main__":
