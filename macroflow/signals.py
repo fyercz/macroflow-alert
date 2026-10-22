@@ -20,6 +20,7 @@ class Params:
     meter_rsi: int = 14
     meter_adx: int = 14
     meter_thres: int = 20
+    meter_ma: str = "EMA"      # MA untuk Meter STRONG: "EMA" (saham) atau "SMA" (alert indeks)
     atr_mult_sl: float = 2.0
 
 
@@ -68,7 +69,8 @@ def daily_upto(daily, hourly, cutoff):
 # ----------------------------------------------------------------------
 def meter(df, p: Params):
     c, h, l = (df[k].to_numpy(float) for k in ("Close", "High", "Low"))
-    e = ta.ema(c, p.meter_ema)
+    ma = ta.sma if str(p.meter_ma).upper() == "SMA" else ta.ema
+    e = ma(c, p.meter_ema)
     r = ta.rsi(c, p.meter_rsi)
     _, _, adx = ta.dmi(h, l, c, p.meter_adx, p.meter_adx)
     bull = (c > e) & (r > 50)

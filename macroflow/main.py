@@ -21,7 +21,7 @@ import pandas as pd
 import requests
 import yaml
 
-from . import data, market, notify
+from . import data, index_alert, market, notify
 from .signals import Params, evaluate
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,7 +36,9 @@ def load_config():
 
 
 def setup_indices(cfg):
-    """Daftarkan indeks (mis. IHSG) dari config. Return {kode: set sinyal}."""
+    """Daftarkan indeks yang ikut scan saham (config `indices`, default kosong) + simbol indeks
+    dari `index_alert`. Return {kode: set sinyal} untuk indeks yang ikut scan saham."""
+    index_alert.register(cfg)
     out = {}
     for code, spec in (cfg.get("indices") or {}).items():
         code = str(code).upper()
@@ -102,7 +104,7 @@ def prepare(cfg, now):
     min_price = float(flt.get("min_price", 50))
     keep = [t for t, df in daily.items() if liquid(df, min_value, min_price, today)]
     log.info("Lolos filter likuiditas: %d saham", len(keep))
-    idx = list(data.YAHOO_SYMBOLS)  # indeks: selalu dicek, tanpa filter
+    idx = [str(c).upper() for c in (cfg.get("indices") or {})]  # indeks ikut scan (default: tidak ada)
     if idx:
         daily.update(data.download(idx, cfg.get("daily_period", "3y"), "1d"))
         keep = idx + [t for t in keep if t not in idx]
@@ -153,11 +155,11 @@ def run_modes(modes, cfg, now, tg, state):
 
     done_days = state.d.setdefault("done", {})
 
-    # --- status IHSG + peringatan keras -------------------------------
-    status = market_status(cfg, daily, hourly, today, now_naive, p)
+    # --- status IHSG + peringatan keras (Daily & Weekly) ---------------
+    status = market_status(cfg, now_naive, p)
     status_txt = ("\n\n" + status.text()) if status else ""
-    if status and status.warning and not done_days.get(f"warn|{day_str}"):
-        done_days[f"warn|{day_str}"] = True
+    if status and status.warning and not done_days.get(f"warn|{status.code}|{day_str}"):
+        done_days[f"warn|{status.code}|{day_str}"] = True
         tg.send_all([status.warning_text() + f"\n\n<i>{now:%d/%m %H:%M} WIB</i>"])
 
     for mode in modes:
@@ -233,36 +235,45 @@ def market_kwargs(mw):
         window_days=int(mw.get("window_days", 5)),
         min_events=int(mw.get("min_events", mw.get("min_strong_sell", 2))),
         signals=tuple(str(x).upper() for x in mw.get("signals", market.DEFAULT_SIGNALS)),
-        timeframes=tuple(str(x).upper() for x in mw.get("timeframes", ["D", "1H"])))
+        timeframes=tuple(str(x).upper() for x in mw.get("timeframes", ["D", "W"])
+                         if str(x).upper() in ("D", "W")))  # 1H tidak dipakai untuk indeks
 
 
-def market_status(cfg, daily, hourly, today, now_naive, p):
-    """Status indeks acuan (default IHSG) untuk header notifikasi. None kalau data tidak ada."""
+def market_status(cfg, now_naive, p):
+    """Status indeks acuan (default IHSG, Daily & Weekly, Meter SMA) untuk header notifikasi saham."""
     mw = cfg.get("market_warning") or {}
     code = str(mw.get("index", "IHSG")).upper()
-    d, h = daily.get(code), hourly.get(code)
-    if d is None or h is None:
-        return None
     try:
-        return market.ihsg_status(data.merge_today(d, h, today), h, now_naive, p, code=code,
-                                  **market_kwargs(mw))
+        d = data.download([code], cfg.get("index_period", "5y"), "1d").get(code)
+        if d is None or len(d) < 60:
+            return None
+        sp = {x["code"]: x for x in index_alert.specs(cfg)}.get(code, {"name": code, "market": "IDX"})
+        fu = index_alert.final_upto(d, now_naive, sp["market"])
+        return market.ihsg_status(d, now_naive, index_alert.index_params(cfg, p), code=code,
+                                  name=sp["name"], final_upto=fu, **market_kwargs(mw))
     except Exception as e:  # status hanya pelengkap, jangan gagalkan notifikasi
         log.warning("Status %s gagal dihitung: %s", code, e)
         return None
 
 
+STOCK_MODES = ("hourly", "daily-preclose", "daily-final")
+INDEX_MODES = {"index-idx": "IDX", "index-us": "US"}
+
+
 def auto_modes(now):
     """Tentukan mode berdasarkan jam WIB (toleran terhadap delay jadwal)."""
-    if now.weekday() >= 5:
-        return []
     hm = now.hour * 60 + now.minute
     modes = []
-    if 10 * 60 <= hm <= 16 * 60 + 59:
-        modes.append("hourly")
-    if 14 * 60 + 30 <= hm < 15 * 60 + 45:
-        modes.append("daily-preclose")
-    if 16 * 60 <= hm <= 19 * 60:
-        modes.append("daily-final")
+    if now.weekday() < 5:  # Senin-Jumat: bursa Indonesia
+        if 10 * 60 <= hm <= 16 * 60 + 59:
+            modes.append("hourly")
+        if 14 * 60 + 30 <= hm < 15 * 60 + 45:
+            modes.append("daily-preclose")
+        if 16 * 60 <= hm <= 19 * 60:
+            modes += ["daily-final", "index-idx"]
+    # Selasa-Sabtu pagi WIB: bursa AS hari sebelumnya sudah tutup
+    if 1 <= now.weekday() <= 5 and 5 * 60 <= hm <= 7 * 60 + 59:
+        modes.append("index-us")
     return modes
 
 
@@ -271,21 +282,36 @@ def cmd_check(cfg, ticker, tf, bars):
     p = params_from(cfg)
     index_sigs = setup_indices(cfg)
     ticker = ticker.upper().replace(".JK", "")
-    d = data.download([ticker], cfg.get("daily_period", "3y"), "1d").get(ticker)
-    h = data.download([ticker], cfg.get("hourly_period", "1y"), "1h").get(ticker)
-    if d is None or h is None:
+    idx_codes = {sp["code"] for sp in index_alert.specs(cfg)}
+    is_index = ticker in idx_codes
+    period = cfg.get("index_period", "5y") if is_index else cfg.get("daily_period", "3y")
+    d = data.download([ticker], period, "1d").get(ticker)
+    h = None
+    if not is_index:
+        h = data.download([ticker], cfg.get("hourly_period", "1y"), "1h").get(ticker)
+    if d is None or (h is None and not is_index):
         print("Data tidak ditemukan untuk", ticker)
         return
-    chart = d if tf == "D" else h
+    if is_index:  # alert indeks: Meter SMA, hanya D & W, tanpa ROYAL/GOLDEN
+        if tf == "1H":
+            print("Indeks hanya memakai timeframe D dan W")
+            return
+        p = index_alert.index_params(cfg, p)
+        names, _ = index_alert.settings(cfg)
+        d = index_alert._novol(d)
+    chart = {"D": d, "1H": h, "W": market.weekly_bars(d)}[tf]
     sigs = evaluate(chart, d, h, tf, p, last_n=bars)
-    if ticker in index_sigs:
+    if is_index:
+        sigs = [s for s in sigs if s.name in names]
+    elif ticker in index_sigs:
         sigs = [s for s in sigs if s.name in index_sigs[ticker]]
-    print(f"\nSinyal {ticker} timeframe {tf}, {bars} bar terakhir:\n")
+    note = f" (Meter {p.meter_ma}50)" if is_index else ""
+    print(f"\nSinyal {ticker} timeframe {tf}, {bars} bar terakhir{note}:\n")
     for s in sigs:
         mm = (f"  SL {s.info['sl']:,.0f}  TP1 {s.info['tp1']:,.0f}  TP2 {s.info['tp2']:,.0f}"
-              if "sl" in s.info else f"  stop Illu {s.info['stop']:,.0f}")
-        when = f"{s.bar_time:%Y-%m-%d}" if tf == "D" else f"{s.bar_time:%Y-%m-%d %H:%M}"
-        print(f"{when}  {s.name:8s} {s.side:4s}  close {s.close:,.0f}{mm}")
+              if "sl" in s.info and not is_index else f"  stop Illu {s.info['stop']:,.2f}")
+        when = f"{s.bar_time:%Y-%m-%d %H:%M}" if tf == "1H" else f"{s.bar_time:%Y-%m-%d}"
+        print(f"{when}  {s.name:8s} {s.side:4s}  close {s.close:,.2f}{mm}")
     if not sigs:
         print("(tidak ada sinyal)")
 
@@ -403,11 +429,11 @@ def main():
     a = sub.add_parser("auto")
     a.add_argument("--dry-run", action="store_true")
     r = sub.add_parser("run")
-    r.add_argument("modes", nargs="+", choices=["hourly", "daily-preclose", "daily-final"])
+    r.add_argument("modes", nargs="+", choices=list(STOCK_MODES) + list(INDEX_MODES))
     r.add_argument("--dry-run", action="store_true")
     c = sub.add_parser("check")
     c.add_argument("ticker")
-    c.add_argument("--tf", choices=["D", "1H"], default="D")
+    c.add_argument("--tf", choices=["D", "1H", "W"], default="D")
     c.add_argument("--bars", type=int, default=120)
     b = sub.add_parser("backtest")
     b.add_argument("--start", default="2026-09-01")
@@ -439,7 +465,14 @@ def main():
         log.info("Di luar jam jadwal (%s WIB) — tidak ada yang dijalankan", f"{now:%a %H:%M}")
         return
     tg = notify.Telegram(dry_run=args.dry_run)
-    run_modes(modes, cfg, now, tg, State(ROOT / "state.json"))
+    state = State(ROOT / "state.json")
+    stock = [m for m in modes if m in STOCK_MODES]
+    if stock:
+        run_modes(stock, cfg, now, tg, state)
+    for m in modes:
+        if m in INDEX_MODES:
+            index_alert.run(cfg, now, tg, state, INDEX_MODES[m], params_from(cfg),
+                            market_kwargs(cfg.get("market_warning") or {}))
 
 
 if __name__ == "__main__":

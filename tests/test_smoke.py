@@ -49,6 +49,7 @@ def daily_from_hourly(h):
 TICKERS = ["AAAA", "BBBB", "CCCC", "BBCA"]
 HOURLY = {t: make_hourly(i, 500 + 800 * i) for i, t in enumerate(TICKERS)}
 HOURLY["IHSG"] = make_hourly(99, 7000)
+HOURLY["SP500"] = make_hourly(55, 6500)
 DAILY = {t: daily_from_hourly(h) for t, h in HOURLY.items()}
 
 
@@ -64,12 +65,16 @@ def patch_data():
 
 CFG = {
     "tickers": [],
-    "indices": {"IHSG": {"yahoo": "^JKSE", "tradingview": "IDX:COMPOSITE",
-                         "signals": ["COMBO", "GOLDEN", "STANDAR", "METER"]}},
+    "indices": {},
+    "index_alert": {"meter_ma": "SMA", "timeframes": ["D", "W"], "signals": ["COMBO", "STANDAR", "METER"],
+                    "indices": {"IHSG": {"yahoo": "^JKSE", "tradingview": "IDX:COMPOSITE",
+                                         "name": "IHSG", "market": "IDX"},
+                                "SP500": {"yahoo": "^GSPC", "tradingview": "SP:SPX",
+                                          "name": "S&P 500", "market": "US"}}},
     "filter": {"min_avg_value": 1e8, "min_price": 50},
     "signals": {"D": ["ROYAL", "COMBO", "GOLDEN", "STANDAR", "METER"],
                 "1H": {"BUY": ["COMBO", "METER"], "SELL": ["ROYAL", "COMBO", "STANDAR", "METER"]}},
-    "market_warning": {"index": "IHSG", "window_days": 5, "min_events": 2},
+    "market_warning": {"index": "IHSG", "window_days": 5, "min_events": 2, "timeframes": ["D", "W"]},
 }
 
 
@@ -154,9 +159,13 @@ def test_auto_modes():
         return datetime(2026, 10, day, h, m, tzinfo=WIB)
     assert main.auto_modes(at(10, 15)) == ["hourly"]
     assert main.auto_modes(at(14, 45)) == ["hourly", "daily-preclose"]
-    assert main.auto_modes(at(16, 15)) == ["hourly", "daily-final"]
-    assert main.auto_modes(at(18, 0)) == ["daily-final"]
+    assert main.auto_modes(at(16, 15)) == ["hourly", "daily-final", "index-idx"]
+    assert main.auto_modes(at(18, 0)) == ["daily-final", "index-idx"]
     assert main.auto_modes(at(10, 15, day=18)) == []  # Minggu
+    assert main.auto_modes(at(5, 15, day=20)) == ["index-us"]   # Selasa pagi: S&P Senin
+    assert main.auto_modes(at(5, 15, day=24)) == ["index-us"]   # Sabtu pagi: S&P Jumat (+Weekly)
+    assert main.auto_modes(at(5, 15, day=19)) == []             # Senin pagi: AS libur akhir pekan
+    assert main.auto_modes(at(5, 15, day=25)) == []             # Minggu
 
 
 def test_notify_split():
@@ -272,21 +281,23 @@ def test_merge_messages():
 def test_market_status_warning():
     now = pd.Timestamp("2026-10-16 16:20")
     h = make_crash_index()
-    s = market.ihsg_status(daily_from_hourly(h), h, now, Params())
+    s = market.ihsg_status(daily_from_hourly(h), now, Params())
     assert s.trend == "TURUN" and s.warning and len(s.sells) >= 2
     assert all(e.time >= pd.Timestamp("2026-10-12") and e.side == "SELL" for e in s.sells)
     assert len({(e.time, e.tf) for e in s.sells}) == len(s.sells)  # 1 kejadian per candle
     assert s.regime in ("UPTREND", "DOWNTREND", "TRANSISI") and "Rezim:" in s.text()
-    only_meter = market.ihsg_status(daily_from_hourly(h), h, now, Params(), signals=("METER",))
+    only_meter = market.ihsg_status(daily_from_hourly(h), now, Params(), signals=("METER",))
     assert all(e.names == ["METER"] for e in only_meter.sells)
     assert len(only_meter.sells) <= len(s.sells)
-    d_only = market.ihsg_status(daily_from_hourly(h), h, now, Params(), timeframes=("D",))
+    d_only = market.ihsg_status(daily_from_hourly(h), now, Params(), timeframes=("D",))
     assert all(e.tf == "D" for e in d_only.sells + d_only.buys)
     txt = s.text()
     assert "PERINGATAN KERAS" in txt and "STATUS IHSG" in txt
-    calm = market.ihsg_status(DAILY["IHSG"], HOURLY["IHSG"], now, Params())
+    calm = market.ihsg_status(DAILY["IHSG"], now, Params())
     assert calm is not None and "STATUS IHSG" in calm.text()
-    strict = market.ihsg_status(daily_from_hourly(h), h, now, Params(), min_events=99)
+    strict = market.ihsg_status(daily_from_hourly(h), now, Params(), min_events=99)
+    assert all(e.tf in ("D", "W") for e in s.sells + s.buys)
+    assert "W: <b>" in txt and "1H" not in txt
     assert not strict.warning and "PERINGATAN KERAS" not in strict.text()
 
 
@@ -330,16 +341,98 @@ def test_ihsg_study():
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "study.xlsx"
             summary, reg = study.run(CFG, Params(), out, now=pd.Timestamp("2026-10-16 16:20"))
-            assert len(summary) >= 10 and summary["Episode"].sum() > 0
+            assert len(summary) >= 9 and summary["Episode"].sum() > 0
             assert set(pd.ExcelFile(out).sheet_names) >= {"Aturan", "Sinyal per rezim", "Episode", "Harian"}
             assert not reg.empty and set(reg["Arah sinyal"]) <= {"BUY", "SELL"}
             harian = pd.read_excel(out, sheet_name="Harian")
-            # aturan dengan 1H hanya dinilai di periode yang punya data 1H
-            assert harian["Ada 1H"].sum() < len(harian)
+            assert "Ada 1H" not in harian.columns
+            assert set(reg["TF"]) <= {"D", "W"}
             txt = study.telegram_text(summary, reg)
             assert "STUDI POLA IHSG" in txt and "episode" in txt
     finally:
         data.download = old
+
+
+def test_meter_sma():
+    from macroflow.signals import meter
+    d = DAILY["AAAA"]
+    e = meter(d, Params())[0]
+    s_ = meter(d, Params(meter_ma="SMA"))[0]
+    assert len(e) == len(s_) and (e != s_).any()  # rumus berbeda menghasilkan skor berbeda
+
+
+def test_final_upto_and_weeks():
+    from macroflow import index_alert
+    d = DAILY["IHSG"]  # berakhir Jumat 16 Okt 2026
+    t = pd.Timestamp
+    assert index_alert.final_upto(d, t("2026-10-16 15:00"), "IDX") == t("2026-10-15")
+    assert index_alert.final_upto(d, t("2026-10-16 16:20"), "IDX") == t("2026-10-16")
+    assert index_alert.final_upto(d, t("2026-10-17 05:15"), "US") == t("2026-10-16")
+    assert index_alert.final_upto(d, t("2026-10-17 02:00"), "US") == t("2026-10-15")
+    w = market.weekly_bars(d)
+    assert w.index[-1] == t("2026-10-16") and (w.index.weekday == 4).all()
+    # Kamis 15 Okt: minggu berjalan belum selesai
+    thu = market.closed_weeks(market.weekly_bars(d[d.index <= t("2026-10-15")]), t("2026-10-15"),
+                              t("2026-10-15 16:20"))
+    assert thu.index[-1] == t("2026-10-09")
+    fri = market.closed_weeks(w, t("2026-10-16"), t("2026-10-16 16:20"))
+    assert fri.index[-1] == t("2026-10-16")
+
+
+def test_index_alert_run():
+    from macroflow import index_alert
+    patch_data()
+    notify.TV_SYMBOLS.clear()
+    data.YAHOO_SYMBOLS.clear()
+    old = data.download
+    calls = []
+
+    def dl(tickers, period, interval, **kw):
+        calls.append((tuple(tickers), interval))
+        return fake_download(tickers, period, interval)
+    data.download = dl
+    kw = main.market_kwargs(CFG["market_warning"])
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            state = main.State(Path(tmp) / "state.json")
+            sent = []
+            for mkt, now in (("IDX", NOW), ("US", datetime(2026, 10, 17, 5, 20, tzinfo=WIB))):
+                tg = FakeTelegram()
+                index_alert.run(CFG, now, tg, state, mkt, Params(), kw)
+                sent += tg.sent
+            assert all(i == "1d" for _, i in calls)  # tanpa data 1H
+            assert {t for c, _ in calls for t in c} == {"IHSG", "SP500"}
+            n_keys = len(state.d["sent"])
+            # sinyal yang sama tidak dikirim dua kali
+            tg2 = FakeTelegram()
+            index_alert.run(CFG, NOW, tg2, state, "IDX", Params(), kw)
+            assert len(state.d["sent"]) == n_keys and not tg2.sent
+            # paksa ada sinyal: hapus state lalu cek format pesan
+            state.d["sent"].clear()
+            state.d["done"].clear()
+            tg3 = FakeTelegram()
+            index_alert.run(CFG, NOW, tg3, state, "IDX", Params(), kw)
+            msg = "\n".join(tg3.sent)
+            if tg3.sent:
+                assert "ALERT INDEKS" in msg and "SMA50" in msg and "STATUS IHSG" in msg
+                assert "1H" not in msg and "S&P 500" not in msg
+            # sinyal hanya D / W, dan bukan ROYAL / GOLDEN
+            for k in state.d["sent"]:
+                _, code, tf, name, side, _ = k.split("|")
+                assert tf in ("D", "W") and name in ("COMBO", "STANDAR", "METER")
+    finally:
+        data.download = old
+
+
+def test_index_alert_messages_format():
+    from macroflow import index_alert
+    from macroflow.signals import Signal
+    rows = [("D", Signal("COMBO", "SELL", TODAY, 6712.45, {"chg": -1.2, "rsi": 40, "stop": 6800.0})),
+            ("D", Signal("METER", "SELL", TODAY, 6712.45, {"chg": -1.2, "rsi": 40, "stop": 6800.0})),
+            ("W", Signal("STANDAR", "BUY", TODAY, 6712.45, {"chg": 0.5, "rsi": 55, "stop": 6500.0}))]
+    lines = index_alert.fmt_signals(rows)
+    assert len(lines) == 2 and "🔷COMBO + 📶STRONG" in lines[0] and "Weekly" in lines[1]
+    assert "6.712,45" in lines[0]
 
 
 if __name__ == "__main__":

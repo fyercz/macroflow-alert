@@ -75,7 +75,7 @@ def run(cfg, start, end=None, tfs=("D", "1H"), out=Path("backtest_hasil.xlsx"),
     flt = cfg.get("filter") or {}
     keep = [t for t, df in daily.items()
             if liquid(df, float(flt.get("min_avg_value", 2e9)), float(flt.get("min_price", 50)), start)]
-    idx = list(data.YAHOO_SYMBOLS)
+    idx = [str(c).upper() for c in (cfg.get("indices") or {})]  # indeks ikut scan (default: tidak ada)
     if idx:
         daily.update(data.download(idx, cfg.get("daily_period", "3y"), "1d"))
         keep = idx + [t for t in keep if t not in idx]

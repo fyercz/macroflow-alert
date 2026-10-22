@@ -25,14 +25,21 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
   STANDAR, METER. 1H BUY: **hanya COMBO + METER**; 1H SELL: ROYAL, COMBO, STANDAR, METER.
   Config `signals.<tf>` = dict `{BUY: [...], SELL: [...]}` atau list (kedua arah); `main.enabled()` → set (nama, arah),
   `main.allowed()` juga menerapkan daftar sinyal indeks.
-- **IHSG** (`^JKSE`, TradingView `IDX:COMPOSITE`) selalu dicek tanpa filter, tampil paling atas,
-  **ROYAL (dan GOLDEN) dimatikan untuk IHSG** (volume indeks Yahoo tidak akurat). Diatur di `indices:` config.
-- **Status IHSG** di header setiap notifikasi (`macroflow/market.py`): NAIK/TURUN/CAMPURAN (Illu Trx D + Meter D),
-  harga, EMA50, **rezim EMA200** (UPTREND = close>EMA200 & EMA200 naik 20 hari; DOWNTREND = kebalikan; selain itu
-  TRANSISI), Illu Trx D sejak kapan, Meter D & 1H, jumlah sinyal SELL/BUY IHSG dalam 5 hari.
+- **Alert indeks** (22 Okt 2026, `macroflow/index_alert.py`, config `index_alert`): IHSG (`^JKSE`, TV `IDX:COMPOSITE`)
+  & S&P 500 (`^GSPC`, TV `SP:SPX`), **hanya Daily & Weekly**, sinyal COMBO/STANDAR/METER (tanpa ROYAL/GOLDEN,
+  volume di-nol-kan), **Meter STRONG pakai SMA50** (`Params.meter_ma="SMA"`; saham tetap EMA50 — keputusan pengguna).
+  Mode `index-idx` (auto 16:00–19:00 WIB Sen–Jum, ikut cron 16:15) & `index-us` (auto 05:00–07:59 WIB Sel–Sab,
+  cron `15 22 * * 1-5` UTC). Hanya candle final (`final_upto`: IDX ≥16:00; US bar < hari ini WIB setelah 05:00).
+  Weekly = `market.weekly_bars` (index = hari bursa terakhir minggu) + `closed_weeks`; W memakai last_n=1, D last_n=2.
+  Dedup key `INDEX|kode|tf|nama|arah|tgl`. Pesan hanya bila ada sinyal baru / peringatan baru.
+- **1H tidak dipakai untuk IHSG di mana pun** (keputusan pengguna 22 Okt): IHSG keluar dari scan saham
+  (`indices: {}`), status/peringatan/ihsg-study memakai Daily & Weekly.
+- **Status IHSG** di header setiap notifikasi saham & di alert indeks (`macroflow/market.py`, download harian sendiri,
+  Meter SMA): NAIK/TURUN/CAMPURAN (Illu Trx D + Meter D), harga, EMA50, **rezim EMA200** (UPTREND = close>EMA200 & EMA200 naik 20 hari; DOWNTREND = kebalikan; selain itu
+  TRANSISI), Illu Trx D sejak kapan, Meter D & W, jumlah sinyal SELL/BUY dalam 5 hari.
   **Peringatan keras** (permintaan pengguna, diperluas 19 Okt dari pola chart): IHSG punya sinyal SELL
-  (COMBO/STANDAR/METER, D **dan** 1H) di ≥2 **candle berbeda** dalam 5 hari bursa → pesan 🚨 tersendiri 1×/hari
-  (`state["done"]["warn|<tgl>"]`) + banner di setiap header. BUY ≥2 candle saat UPTREND → baris "✅ Konfirmasi tren naik".
+  (COMBO/STANDAR/METER, D **dan** W) di ≥2 **candle berbeda** dalam 5 hari bursa → pesan 🚨 1×/hari per indeks
+  (`state["done"]["warn|<kode>|<tgl>"]`) + banner di setiap header. BUY ≥2 candle saat UPTREND → baris "✅ Konfirmasi tren naik".
   Config `market_warning`: index, window_days, min_events (alias lama min_strong_sell), signals, timeframes.
 - Pengamatan pengguna dari chart IHSG (2 screenshot TradingView): sinyal searah EMA200 berhasil, melawan EMA200 gagal;
   kumpulan 2–3 sinyal searah dalam beberapa hari mendahului pergerakan besar. **Belum terbukti dengan data** —
@@ -52,9 +59,10 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 | `macroflow/signals.py` | Pembentukan H4 (09–13 & 13–17 WIB, pola TradingView IDX), D parsial, W; `meter()`; `evaluate()` → list `Signal`; `sl_tp()` |
 | `macroflow/data.py` | Daftar saham (TradingView scanner), download Yahoo per 80 ticker, `YAHOO_SYMBOLS` untuk indeks |
 | `macroflow/notify.py` | Format HTML Telegram, `merge_signals()` gabung sinyal ganda, split 3900 char, `TV_SYMBOLS` untuk indeks |
-| `macroflow/market.py` | `regime()`, `signal_events()` (1 Event per candle), `ihsg_status()` → `MarketStatus` (`.warning`, `.buy_confirm`, `.text()`, `.warning_text()`) |
-| `macroflow/study.py` | `ihsg-study`: per hari as-of close hitung kumpulan sinyal & rezim, ret 5/10/20h ke depan, episode, Excel 5 sheet + teks Telegram. IHSG D 10y, 1H 729d. Volume di-nol-kan → ROYAL tidak dihitung (cepat) |
-| `macroflow/main.py` | CLI: `auto`, `run <mode>`, `check TICKER --tf D/1H`, `backtest --start [--end] [--tf D 1H]` (tanggal divalidasi, exit 1 kalau salah), `ihsg-study [--telegram]`, `test-telegram` (diagnostik 3 langkah, exit 1 kalau gagal), `chat-id` |
+| `macroflow/market.py` | `regime()`, `weekly_bars()`, `closed_weeks()`, `signal_events()` (1 Event per candle, D/W), `ihsg_status(daily, now, p, ..., final_upto)` → `MarketStatus`, `fmt_index()` (6.712,45) |
+| `macroflow/index_alert.py` | Alert indeks D & W: `specs/register/index_params/final_upto/index_signals/run` |
+| `macroflow/study.py` | `ihsg-study`: per hari as-of close hitung kumpulan sinyal (D+W, Meter SMA) & rezim, ret 5/10/20h ke depan, episode, Excel 5 sheet + teks Telegram. IHSG D 10y |
+| `macroflow/main.py` | CLI: `auto`, `run <mode>`, `check TICKER --tf D/1H/W` (indeks: SMA, D/W saja), `backtest --start [--end] [--tf D 1H]` (tanggal divalidasi, exit 1 kalau salah), `ihsg-study [--telegram]`, `test-telegram` (diagnostik 3 langkah, exit 1 kalau gagal), `chat-id` |
 | `macroflow/backtest.py` | Putar ulang sinyal sejak tanggal X, simulasi SL/TP1/TP2, return 5/10 bar, Excel 4 sheet, ringkasan Telegram |
 | `config.yaml` | Semua setelan yang boleh diubah pengguna |
 | `tests/test_smoke.py` | Tes offline dengan data sintetis — **jalankan setiap habis mengubah kode** |
@@ -88,7 +96,7 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 ## Status terakhir (19 Okt 2026)
 
-- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (15 tes, ±30 detik, jalan tanpa pytest:
+- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (19 tes, ±30 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
 - Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:

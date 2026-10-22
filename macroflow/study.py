@@ -1,7 +1,8 @@
 """Studi pola IHSG: apakah kumpulan sinyal & rezim EMA200 mendahului rally / penurunan?
 
 Untuk setiap hari bursa, dihitung (as-of penutupan hari itu, tanpa melihat masa depan):
-  - jumlah candle bersinyal SELL / BUY dalam N hari bursa terakhir (Daily dan/atau 1H)
+  - jumlah candle bersinyal SELL / BUY dalam N hari bursa terakhir (Daily dan/atau Weekly;
+    candle Weekly dihitung pada hari terakhir minggunya). Meter STRONG memakai SMA50.
   - rezim EMA200 (UPTREND / DOWNTREND / TRANSISI)
 lalu diukur apa yang terjadi pada IHSG 5, 10, dan 20 hari bursa berikutnya.
 
@@ -13,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from . import data, indicators as ta
-from .market import SLOPE_BARS, regime
+from .market import SLOPE_BARS, closed_weeks, regime, weekly_bars
 from .signals import evaluate
 
 log = logging.getLogger("macroflow.study")
@@ -42,7 +43,7 @@ def _day_counts(sig, days, side, names, tfs):
     return cnt.reindex(days, fill_value=0)
 
 
-def build_daily(d, h, p, window=5):
+def build_daily(d, p, window=5, now=None):
     """Tabel harian: close, rezim, return ke depan, dan hitungan sinyal untuk berbagai aturan."""
     days = d.index
     c = d["Close"].to_numpy(float)
@@ -53,11 +54,10 @@ def build_daily(d, h, p, window=5):
     reg = [regime(c[i], e200[i], prev[i]) if not np.isnan(prev[i]) else None for i in range(len(c))]
 
     sig = _signals(d, d, "D", p)
-    if h is not None and len(h):
-        sig = pd.concat([sig, _signals(h, d, "1H", p)], ignore_index=True)
-        h_start = h.index[0].normalize()
-    else:
-        h_start = None
+    now = d.index[-1] + pd.Timedelta(days=1) if now is None else now
+    wk = closed_weeks(weekly_bars(d), d.index[-1], now)
+    if wk is not None and len(wk) >= 30:
+        sig = pd.concat([sig, _signals(wk, d, "W", p)], ignore_index=True)
 
     df = pd.DataFrame({"Close": c, "Rezim": reg}, index=days)
     df["EMA200"] = e200
@@ -74,36 +74,28 @@ def build_daily(d, h, p, window=5):
         up[i] = hi[i + 1:j].max() / c[i] * 100 - 100
     df["Max turun 20h %"] = dd
     df["Max naik 20h %"] = up
-    # data 1H tersedia untuk seluruh jendela?
-    df["Ada 1H"] = False
-    if h_start is not None:
-        ok = np.zeros(n, bool)
-        ok[window - 1:] = days[:n - window + 1] >= h_start
-        df["Ada 1H"] = ok
 
     for side in ("SELL", "BUY"):
-        for label, names, tfs in (("semua", ALL, ("D", "1H")), ("semuaD", ALL, ("D",)),
-                                  ("strong", ("METER",), ("D", "1H"))):
+        for label, names, tfs in (("semua", ALL, ("D", "W")), ("semuaD", ALL, ("D",)),
+                                  ("strong", ("METER",), ("D", "W"))):
             per_day = _day_counts(sig, days, side, names, tfs)
             df[f"{side}_{label}"] = per_day.rolling(window, min_periods=1).sum().astype(int).values
     return df, sig
 
 
 def rules(df, window=5):
-    """(nama aturan, arah yang diharapkan, mask hari aktif, butuh 1H?)"""
+    """(nama aturan, arah yang diharapkan, mask hari aktif)"""
     R = []
     dn, upt = df["Rezim"] == "DOWNTREND", df["Rezim"] == "UPTREND"
-    R.append((f"STRONG SELL ≥2× dalam {window} hari (D+1H) — aturan lama", "turun", df.SELL_strong >= 2, True))
-    R.append((f"Semua SELL ≥2 candle dalam {window} hari (D+1H) — aturan baru", "turun", df.SELL_semua >= 2, True))
-    R.append((f"Semua SELL ≥3 candle dalam {window} hari (D+1H)", "turun", df.SELL_semua >= 3, True))
-    R.append((f"Semua SELL ≥2 candle dalam {window} hari (Daily saja)", "turun", df.SELL_semuaD >= 2, False))
-    R.append(("Aturan baru + DOWNTREND", "turun", (df.SELL_semua >= 2) & dn, True))
-    R.append(("Daily SELL ≥2 + DOWNTREND", "turun", (df.SELL_semuaD >= 2) & dn, False))
-    R.append(("DOWNTREND (rezim saja)", "turun", dn, False))
-    R.append(("UPTREND (rezim saja)", "naik", upt, False))
-    R.append((f"Semua BUY ≥2 candle dalam {window} hari (D+1H)", "naik", df.BUY_semua >= 2, True))
-    R.append(("BUY ≥2 (D+1H) + UPTREND — konfirmasi tren naik", "naik", (df.BUY_semua >= 2) & upt, True))
-    R.append(("Daily BUY ≥2 + UPTREND", "naik", (df.BUY_semuaD >= 2) & upt, False))
+    R.append((f"STRONG SELL ≥2× dalam {window} hari (D+W)", "turun", df.SELL_strong >= 2))
+    R.append((f"Semua SELL ≥2 candle dalam {window} hari (D+W) — aturan aktif", "turun", df.SELL_semua >= 2))
+    R.append((f"Semua SELL ≥3 candle dalam {window} hari (D+W)", "turun", df.SELL_semua >= 3))
+    R.append((f"Semua SELL ≥2 candle dalam {window} hari (Daily saja)", "turun", df.SELL_semuaD >= 2))
+    R.append(("Aturan aktif + DOWNTREND", "turun", (df.SELL_semua >= 2) & dn))
+    R.append(("DOWNTREND (rezim saja)", "turun", dn))
+    R.append(("UPTREND (rezim saja)", "naik", upt))
+    R.append((f"Semua BUY ≥2 candle dalam {window} hari (D+W)", "naik", df.BUY_semua >= 2))
+    R.append(("BUY ≥2 (D+W) + UPTREND — konfirmasi tren naik", "naik", (df.BUY_semua >= 2) & upt))
     return R
 
 
@@ -122,9 +114,9 @@ def _episodes(mask, gap=5):
 
 def summarize(df, window=5):
     rows, eps = [], []
-    for name, expect, mask, need_h in rules(df, window):
-        base = df[df["Ada 1H"]] if need_h else df
-        mask = mask.reindex(base.index, fill_value=False)
+    for name, expect, mask in rules(df, window):
+        base = df
+        mask = mask.fillna(False).astype(bool)
         ep = _episodes(mask)
         e = base[ep]
         good = (e["Ret 10h %"] < 0) if expect == "turun" else (e["Ret 10h %"] > 0)
@@ -148,8 +140,8 @@ def summarize(df, window=5):
 
 
 def by_regime(df, sig):
-    """Kinerja setiap sinyal Daily IHSG dikelompokkan menurut rezim saat sinyal muncul."""
-    s = sig[sig.tf == "D"].drop_duplicates(["time", "side"]).copy()
+    """Kinerja sinyal IHSG (Daily & Weekly) dikelompokkan menurut rezim saat sinyal muncul."""
+    s = sig.drop_duplicates(["time", "tf", "side"]).copy()
     if s.empty:
         return pd.DataFrame()
     s["Rezim"] = s.time.map(df["Rezim"])
@@ -157,7 +149,8 @@ def by_regime(df, sig):
     s["Ret 20h %"] = s.time.map(df["Ret 20h %"])
     s = s.dropna(subset=["Rezim", "Ret 10h %"])
     s["benar"] = np.where(s.side == "BUY", s["Ret 10h %"] > 0, s["Ret 10h %"] < 0)
-    g = s.groupby(["side", "Rezim"]).agg(
+    s["TF"] = s.tf
+    g = s.groupby(["TF", "side", "Rezim"]).agg(
         Jumlah=("benar", "size"), **{"Arah benar 10h %": ("benar", lambda x: x.mean() * 100)},
         **{"Rata2 ret 10h %": ("Ret 10h %", "mean")}, **{"Rata2 ret 20h %": ("Ret 20h %", "mean")})
     return g.reset_index().rename(columns={"side": "Arah sinyal"})
@@ -180,7 +173,8 @@ def write_excel(out, summary, regime_tbl, eps, df):
             "Setiap hari dihitung as-of penutupan: jumlah candle bersinyal dalam 5 hari bursa terakhir.",
             "Beberapa sinyal di candle yang sama dihitung 1. 'Semua' = COMBO, STANDAR, METER (STRONG).",
             "Episode = hari pertama aturan aktif setelah minimal 5 hari bursa tidak aktif.",
-            "Aturan dengan 1H hanya dinilai pada periode yang punya data 1 jam (Yahoo: ±2 tahun).",
+            "Weekly: candle mingguan yang sudah selesai, dihitung pada hari bursa terakhir minggunya.",
+            "Meter STRONG memakai SMA50 (sama dengan alert indeks).",
             "Rezim: UPTREND = harga > EMA200 dan EMA200 naik 20 hari; DOWNTREND = kebalikannya.",
             "Bandingkan kolom (episode) dengan (semua hari): selisih besar = aturan punya informasi.",
             "Sampel kecil (puluhan episode) — anggap sebagai petunjuk, bukan kepastian.",
@@ -214,33 +208,30 @@ def telegram_text(summary, regime_tbl):
             f"ret 10h {r[k]:+.1f}% (normal {r[b]:+.1f}%) · turun ≥5% dlm 20h: "
             f"{r['Turun ≥5% dalam 20h (%)']:.0f}% (normal {r['Baseline turun ≥5% dalam 20h (%)']:.0f}%)")
     if len(regime_tbl):
-        lines.append("\n<b>Sinyal Daily IHSG per rezim</b> (arah benar 10 hari)")
+        lines.append("\n<b>Sinyal IHSG per rezim</b> (arah benar 10 hari bursa)")
         for _, r in regime_tbl.iterrows():
-            lines.append(f"• {r['Arah sinyal']} saat {r['Rezim']}: {r['Jumlah']}× · "
+            lines.append(f"• {r['TF']} {r['Arah sinyal']} saat {r['Rezim']}: {r['Jumlah']}× · "
                          f"benar {r['Arah benar 10h %']:.0f}% · ret 10h {r['Rata2 ret 10h %']:+.1f}%")
     lines.append("\nDetail: file Excel <b>ihsg-study</b> di halaman run GitHub.")
     return "\n".join(lines)
 
 
 def run(cfg, p, out, code="IHSG", window=5, daily_period="10y", now=None):
+    from .index_alert import index_params
+
     mw = cfg.get("market_warning") or {}
     code = str(mw.get("index", code)).upper()
     window = int(mw.get("window_days", window))
+    p = index_params(cfg, p)  # Meter STRONG dengan SMA, sama dengan alert indeks
     d = data.download([code], daily_period, "1d").get(code)
     if d is None or len(d) < 260:
         raise RuntimeError(f"Data harian {code} tidak tersedia")
-    h = None
-    for period in ("729d", "2y", "1y"):
-        try:
-            h = data.download([code], period, "1h").get(code)
-        except Exception as e:  # noqa: BLE001
-            log.warning("1H %s gagal (%s)", period, e)
-        if h is not None and len(h):
-            break
-    if h is not None and now is not None:  # buang candle 1H yang belum close
-        h = h[h.index + pd.Timedelta(hours=1) <= now]
-    log.info("Studi %s: %d hari, %d bar 1H", code, len(d), 0 if h is None else len(h))
-    df, sig = build_daily(d, h, p, window)
+    if now is not None:  # buang bar hari ini kalau belum close
+        from .index_alert import final_upto
+        fu = final_upto(d, now, "IDX")
+        d = d[d.index <= fu] if fu is not None else d
+    log.info("Studi %s: %d hari (Daily & Weekly, Meter %s)", code, len(d), p.meter_ma)
+    df, sig = build_daily(d, p, window, now)
     summary, eps = summarize(df, window)
     reg = by_regime(df, sig)
     write_excel(out, summary, reg, eps, df)

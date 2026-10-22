@@ -26,26 +26,43 @@ SL = close − 2×ATR14, TP1 = 2R, TP2 = 3R (dibulatkan ke fraksi harga BEI). Si
 GOLDEN dimatikan (hasil backtest paling jelek). Kalau satu saham mendapat beberapa sinyal di candle yang sama,
 semuanya digabung jadi satu baris, misalnya `🔷COMBO + 📶STRONG`. Saham dengan sinyal terbanyak tampil paling atas.
 
+## Alert indeks: IHSG & S&P 500 (Daily & Weekly)
+
+Pesan tersendiri **📈 ALERT INDEKS**, hanya timeframe **Daily dan Weekly** (tanpa 1H):
+
+| Indeks | Dikirim | Isi |
+|---|---|---|
+| IHSG | ±16:15 WIB, Senin–Jumat (setelah bursa tutup) | sinyal Daily hari itu; Jumat + sinyal Weekly |
+| S&P 500 | ±05:15 WIB, Selasa–Sabtu (setelah bursa AS tutup) | sinyal Daily hari sebelumnya; Sabtu + sinyal Weekly |
+
+- Sinyal: 📶 **STRONG BUY/SELL**, 🔷 COMBO, 📍 STANDAR (Illu Trx). ROYAL & GOLDEN tidak dipakai untuk indeks.
+- **STRONG BUY/SELL indeks memakai SMA50** (harga di atas/bawah SMA50 + RSI14 > / < 50 + ADX14 > 20).
+  Sinyal saham tetap memakai EMA50.
+- Hanya candle yang sudah final. Candle Weekly dikirim setelah minggunya selesai.
+- Setiap pesan juga berisi status indeks (lihat di bawah) dan peringatan keras bila aktif.
+- Pesan hanya dikirim kalau ada sinyal baru atau peringatan baru. Atur di `index_alert` pada `config.yaml`.
+- Cek riwayat: `python -m macroflow.main check SP500 --tf W` (atau `IHSG`, `--tf D`).
+
 ## Status IHSG & peringatan keras
 
-Setiap notifikasi diawali **status IHSG**:
+Notifikasi saham (1H & Daily) diawali **status IHSG**, dihitung dari Daily & Weekly (tanpa 1H):
 - arah (🟢 NAIK / 🔴 TURUN / 🟡 CAMPURAN) dari Illu Trx & Meter Daily, harga, % perubahan, posisi terhadap EMA50;
 - **rezim EMA200**: 🟢 UPTREND (harga di atas EMA200 yang naik), 🔴 DOWNTREND (di bawah EMA200 yang turun),
   atau 🟡 TRANSISI. Dari chart IHSG 2025–2026: saat UPTREND sinyal SELL tunggal sering jebakan,
   saat DOWNTREND sinyal BUY biasanya hanya pantulan;
-- jumlah sinyal SELL & BUY IHSG dalam 5 hari bursa terakhir.
+- Meter Daily & Weekly (SMA50) dan jumlah sinyal SELL & BUY IHSG dalam 5 hari bursa terakhir.
 
-**🚨 PERINGATAN KERAS** muncul bila IHSG mendapat sinyal SELL (COMBO, STANDAR, atau STRONG SELL) di
-**2 candle berbeda atau lebih dalam 5 hari bursa terakhir** (Daily & 1H dihitung). Peringatan dikirim sebagai
-pesan tersendiri (sekali per hari) dan banner di atas setiap notifikasi hari itu. Kalau ada ≥2 sinyal BUY
-saat UPTREND, status menampilkan **✅ Konfirmasi tren naik**. Semua angka bisa diubah di `market_warning`.
+**🚨 PERINGATAN KERAS** muncul bila indeks mendapat sinyal SELL (COMBO, STANDAR, atau STRONG SELL) di
+**2 candle berbeda atau lebih dalam 5 hari bursa terakhir** (Daily & Weekly). Peringatan dikirim sekali per hari
+per indeks dan tampil sebagai banner di atas notifikasi hari itu. Kalau ada ≥2 sinyal BUY saat UPTREND,
+status menampilkan **✅ Konfirmasi tren naik**. Angka-angkanya bisa diubah di `market_warning`.
 
 ### Menguji pola dengan data asli (`ihsg-study`)
 Actions → MacroFlow Alert → Run workflow → pilih **`ihsg-study`** (±2 menit). Ringkasan dikirim ke Telegram dan
 file Excel **ihsg-study** bisa diunduh di halaman run. Isinya: untuk setiap aturan (STRONG SELL ≥2, semua SELL ≥2/≥3,
-Daily saja, + DOWNTREND, BUY + UPTREND, dll.) berapa kali muncul dan apa yang terjadi pada IHSG 5/10/20 hari
+Daily saja, + DOWNTREND, BUY + UPTREND, dll., semuanya Daily & Weekly) berapa kali muncul dan apa yang terjadi pada IHSG 5/10/20 hari
 sesudahnya dibanding hari biasa, serta seberapa sering sinyal IHSG benar menurut rezim EMA200.
-Data: IHSG harian 10 tahun, 1 jam ±2 tahun (batas Yahoo).
+Data: IHSG harian 10 tahun (Daily & Weekly, Meter SMA50 — sama dengan alert indeks).
 
 ## Jadwal (WIB, Senin–Jumat)
 
@@ -53,7 +70,8 @@ Data: IHSG harian 10 tahun, 1 jam ±2 tahun (batas Yahoo).
 |---|---|
 | 10:15, 11:15, 12:15, 14:15, 15:15 | Sinyal **1H** dari candle 1 jam yang baru close |
 | 14:45 | Sinyal **Daily SEMENTARA** (candle hari ini belum close, masih sempat masuk di pre-closing) |
-| 16:15 | Sinyal 1H candle terakhir + **Daily FINAL**, termasuk daftar sinyal sementara yang batal |
+| 16:15 | Sinyal 1H candle terakhir + **Daily FINAL**, termasuk daftar sinyal sementara yang batal, + **alert IHSG** |
+| 05:15 (Sel–Sab) | **Alert S&P 500** (bursa AS hari sebelumnya) |
 
 Hari libur bursa terdeteksi otomatis (tidak ada data hari itu, jadi tidak ada notifikasi).
 Jadwal GitHub kadang telat 5–15 menit, dan itu masih aman karena datanya memang delay.
@@ -99,8 +117,9 @@ App ini sudah download per kelompok dan otomatis mencoba ulang.
 ## Mengatur (`config.yaml`)
 
 - `tickers`: biarkan `[]` untuk semua saham IDX, atau isi daftar sendiri.
-- `indices`: indeks yang selalu dicek dan tampil paling atas di pesan. Default IHSG (`^JKSE`), dengan semua sinyal
-  kecuali ROYAL (volume indeks di Yahoo tidak akurat). Cek riwayatnya: `python -m macroflow.main check IHSG`.
+- `index_alert`: indeks untuk alert indeks (default IHSG & S&P 500), rumus Meter (`meter_ma: SMA`), timeframe, jenis sinyal.
+  Tambah indeks lain dengan simbol Yahoo-nya, misalnya `NASDAQ: {yahoo: "^IXIC", tradingview: "NASDAQ:IXIC", name: "Nasdaq", market: US}`.
+- `indices`: (opsional) indeks yang ikut scan saham per jam. Default kosong.
 - `filter.min_avg_value`: saham dengan rata-rata nilai transaksi 20 hari di bawah angka ini tidak dicek
   (default Rp 2 miliar). Naikkan kalau notifikasinya terlalu banyak.
 - `signals`: jenis sinyal per timeframe dan arah (`BUY` / `SELL`). Hapus yang tidak perlu. Bisa juga ditulis
@@ -156,7 +175,7 @@ Isi Excel:
 
 ```bash
 python -m macroflow.main auto                 # yang dipanggil jadwal (otomatis sesuai jam)
-python -m macroflow.main run daily-final      # paksa mode tertentu (hourly / daily-preclose / daily-final)
+python -m macroflow.main run daily-final      # paksa mode tertentu (hourly / daily-preclose / daily-final / index-idx / index-us)
 python -m macroflow.main run hourly --dry-run # print ke layar, tidak kirim Telegram
 python -m macroflow.main test-telegram
 python -m macroflow.main ihsg-study           # uji pola IHSG, hasil ihsg_study.xlsx

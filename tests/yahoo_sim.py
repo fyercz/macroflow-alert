@@ -14,7 +14,7 @@ def fake(syms, period, interval, group_by="ticker", **kw):
     frames = {}
     for i, s in enumerate(syms):
         days = 2500 if interval == "1d" else 480
-        h = t.make_hourly(i + 3, 6000 if s == "^JKSE" else 1000 + 50 * i, days=days, end=pd.Timestamp("2026-10-19"))
+        h = t.make_hourly(i + 3, 6000 if s == "^JKSE" else 1000 + 50 * i, days=days, end=pd.Timestamp.now().normalize())
         h.loc[h.index[-1], "Close"] = np.nan  # baris kosong seperti Yahoo
         df = t.daily_from_hourly(h) if interval == "1d" else h
         idx = df.index.tz_localize("Asia/Jakarta")

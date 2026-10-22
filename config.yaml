@@ -7,13 +7,20 @@
 # tickers: [BBCA, BBRI, ANTM, ARCI]
 tickers: []
 
-# Indeks yang selalu dicek (tanpa filter likuiditas), tampil paling atas di Telegram.
-# ROYAL dimatikan untuk IHSG karena volume indeks di Yahoo tidak akurat.
-indices:
-  IHSG:
-    yahoo: "^JKSE"
-    tradingview: "IDX:COMPOSITE"
-    signals: [COMBO, STANDAR, METER]
+# ALERT INDEKS — pesan tersendiri, hanya timeframe Daily & Weekly.
+#   IHSG   : dikirim ±16:15 WIB (Sen–Jum) setelah bursa tutup
+#   S&P 500: dikirim ±05:15 WIB (Sel–Sab) setelah bursa AS tutup
+# Weekly dikirim setelah minggunya selesai (Jumat). ROYAL & GOLDEN tidak dipakai untuk indeks.
+index_alert:
+  meter_ma: SMA                       # STRONG BUY/SELL: harga vs SMA50 (saham tetap EMA50)
+  timeframes: [D, W]
+  signals: [COMBO, STANDAR, METER]    # METER = STRONG BUY / STRONG SELL
+  indices:
+    IHSG:  {yahoo: "^JKSE", tradingview: "IDX:COMPOSITE", name: "IHSG", market: IDX}
+    SP500: {yahoo: "^GSPC", tradingview: "SP:SPX", name: "S&P 500", market: US}
+
+# (opsional) indeks yang ikut scan saham per jam. Dikosongkan: IHSG sekarang lewat index_alert.
+indices: {}
 
 # Filter supaya saham tidak likuid tidak ikut dikirim
 filter:
@@ -32,7 +39,7 @@ signals:
     BUY:  [COMBO, METER]
     SELL: [ROYAL, COMBO, STANDAR, METER]
 
-# Status IHSG di atas setiap notifikasi (arah, rezim EMA200, Illu Trx, Meter) +
+# Status IHSG di atas setiap notifikasi saham (arah, rezim EMA200, Illu Trx, Meter D & W) +
 # PERINGATAN KERAS bila IHSG mendapat sinyal SELL di beberapa candle berbeda dalam
 # beberapa hari bursa terakhir. Uji dulu dengan perintah `ihsg-study` di menu Run workflow.
 market_warning:
@@ -40,7 +47,7 @@ market_warning:
   window_days: 5                    # jumlah hari bursa yang dilihat
   min_events: 2                     # peringatan keras bila jumlah candle bersinyal SELL >= angka ini
   signals: [COMBO, STANDAR, METER]  # jenis sinyal SELL yang dihitung (METER = STRONG SELL)
-  timeframes: [D, 1H]               # timeframe yang dihitung
+  timeframes: [D, W]                # timeframe yang dihitung (Daily & Weekly; 1H tidak dipakai)
 
 # Parameter indikator (sama dengan input Pine Script)
 params:
