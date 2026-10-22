@@ -27,7 +27,7 @@ SMC_LEGEND = ("SMC (LuxAlgo): 🔄CHoCH = change of character (structure flips) 
               "(trend continues) · (int) = internal structure, (swing) = swing structure · 🧱OB = order block "
               "broken (BUY: price broke above a supply OB, SELL: price broke below a demand OB) · "
               "🕳FVG = new fair value gap")
-LEGEND = ("<i>👑ROYAL = H4+D+W meters + volume · 🔷COMBO = Illu Trx + EMA50 + MACD + RSI · "
+LEGEND = ("<i>⭐A+ = SMC CHoCH + COMBO/STRONG together (best BUY combination in backtest) · 👑ROYAL = H4+D+W meters + volume · 🔷COMBO = Illu Trx + EMA50 + MACD + RSI · "
           "📍STANDARD = Illu Trx reversal · 📶STRONG = Meter STRONG BUY/SELL · 🌟GOLDEN = MA200 + Stoch · "
           + SMC_LEGEND + " · Prices: regular candles, signals & zones: Heikin Ashi</i>")
 
@@ -86,6 +86,12 @@ def short_name(s):
     return SHORT[s.name] + (f"({lvl})" if lvl else "")
 
 
+def is_a_plus(side, sigs):
+    """Setup A+ (backtest Apr–Sep 2026): BUY dengan SMC CHoCH + COMBO/STRONG di candle yang sama."""
+    names = {s.name for s in sigs}
+    return side == "BUY" and "CHOCH" in names and bool(names & {"COMBO", "METER"})
+
+
 def zone_text(sigs, fmt=None):
     """' (OB zone 950–980)' untuk sinyal OB/FVG yang punya zona."""
     fmt = fmt or fmt_price
@@ -124,11 +130,20 @@ def build_messages(header, items, footer="", show_time=False):
         sigs = m[3]
         return (-len(sigs), ORDER.index(sigs[0].name), -(sigs[0].info.get("vol_ratio") or 0), m[0])
 
+    a_plus = sorted((m for m in merged if is_a_plus(m[1], m[3])), key=key)
+    if a_plus:
+        lines = [f"⭐ <b>A+ BUY SETUP</b> — CHoCH + COMBO/STRONG on the same candle "
+                 f"({len({m[0] for m in a_plus})} stocks)"]
+        lines += ["⭐ " + _merged_line(t, sigs, show_time) for t, _, _, sigs in a_plus]
+        blocks.append("\n".join(lines))
+    merged = [m for m in merged if not is_a_plus(m[1], m[3])]
+
     for side, emoji in (("BUY", "🟢"), ("SELL", "🔴")):
         rows = sorted((m for m in merged if m[1] == side), key=key)
         if not rows:
             continue
-        lines = [f"{emoji} <b>{side}</b> — {len({m[0] for m in rows})} stocks"]
+        other = " (other)" if a_plus and side == "BUY" else ""
+        lines = [f"{emoji} <b>{side}{other}</b> — {len({m[0] for m in rows})} stocks"]
         lines += [_merged_line(t, sigs, show_time) for t, _, _, sigs in rows]
         blocks.append("\n".join(lines))
     if not blocks:

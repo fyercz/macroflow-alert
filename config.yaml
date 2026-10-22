@@ -35,9 +35,10 @@ filter:
 # Dasar pilihan saat ini: backtest 1 Apr–30 Sep 2026 (GOLDEN paling rugi; 1H BUY terbaik COMBO & METER).
 # SMC di 1H hanya CHOCH & OB (BOS & FVG di 1H sangat sering muncul) — tambahkan kalau mau.
 signals:
+  # Daily (backtest HA+SMC Apr–Sep 2026): ROYAL, OB BUY, dan FVG SELL dimatikan (hasil terburuk).
   D:
-    BUY:  [ROYAL, COMBO, STANDAR, METER, CHOCH, BOS, OB, FVG]
-    SELL: [ROYAL, COMBO, STANDAR, METER, CHOCH, BOS, OB, FVG]
+    BUY:  [COMBO, STANDAR, METER, CHOCH, BOS, FVG]
+    SELL: [COMBO, STANDAR, METER, CHOCH, BOS, OB]
   1H:
     BUY:  [COMBO, METER, CHOCH, OB]
     SELL: [ROYAL, COMBO, STANDAR, METER, CHOCH, OB]

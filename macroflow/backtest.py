@@ -112,7 +112,9 @@ def run(cfg, start, end=None, tfs=("D", "1H"), out=Path("backtest_hasil.xlsx"),
                 if not allowed(s, t, allow, index_sigs) or s.bar_time < start:
                     continue
                 r = {"Waktu": s.bar_time, "Saham": t, "TF": tf, "Sinyal": s.name, "Arah": s.side,
-                     "Close": s.close, "RSI": s.info.get("rsi"), "Vol x": s.info.get("vol_ratio")}
+                     "Close": s.close, "RSI": s.info.get("rsi"), "Vol x": s.info.get("vol_ratio"),
+                     "Lapis SMC": s.info.get("smc_level"),
+                     "Zona SMC": ("{:.2f}–{:.2f}".format(*s.info["zone"]) if s.info.get("zone") else None)}
                 r.update(simulate(chart, pos[s.bar_time], s))
                 rows.append(r)
         if k % 50 == 0:
@@ -125,7 +127,7 @@ def run(cfg, start, end=None, tfs=("D", "1H"), out=Path("backtest_hasil.xlsx"),
     df = df.sort_values(["TF", "Waktu", "Saham"]).reset_index(drop=True)
     cols = ["Waktu", "Saham", "TF", "Sinyal", "Arah", "Close", "SL", "TP1", "TP2", "Hasil",
             "Bar ke hasil", "Ret 5 bar %", "Ret 10 bar %", "Ret s/d kini %", "Max naik %",
-            "Max turun %", "RSI", "Vol x"]
+            "Max turun %", "RSI", "Vol x", "Lapis SMC", "Zona SMC"]
     df = df[[c for c in cols if c in df] + [c for c in df if c not in cols]]
     summary = summarize(df)
     write_excel(df, summary, out, start, end, len(keep))

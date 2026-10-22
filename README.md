@@ -26,11 +26,13 @@ Heikin Ashi (sama dengan chart). Harga zona = skala Heikin Ashi. Atur di `params
 
 | Timeframe | BUY | SELL |
 |---|---|---|
-| Daily | ROYAL, COMBO, STANDAR, METER, CHoCH, BOS, OB, FVG | ROYAL, COMBO, STANDAR, METER, CHoCH, BOS, OB, FVG |
+| Daily | COMBO, STANDAR, METER, CHoCH, BOS, FVG | COMBO, STANDAR, METER, CHoCH, BOS, OB |
 | 1H | COMBO, METER, CHoCH, OB | ROYAL, COMBO, STANDAR, METER, CHoCH, OB |
 | Indeks (D & W) | COMBO, STANDAR, METER, CHoCH, BOS, OB, FVG | sama |
 
-GOLDEN dimatikan (hasil backtest paling jelek). Kalau satu saham mendapat beberapa sinyal di candle yang sama,
+GOLDEN dimatikan (hasil backtest paling jelek). Di Daily, ROYAL, OB BUY, dan FVG SELL juga dimatikan
+(backtest Heikin Ashi + SMC, Apr–Sep 2026). **⭐ A+ BUY SETUP** = saham yang mendapat SMC CHoCH bersamaan dengan
+COMBO atau STRONG di candle yang sama (kombinasi BUY terbaik di backtest) — ditampilkan paling atas. Kalau satu saham mendapat beberapa sinyal di candle yang sama,
 semuanya digabung jadi satu baris, misalnya `🔷COMBO + 📶STRONG`. Saham dengan sinyal terbanyak tampil paling atas.
 
 ## Alert indeks: IHSG & S&P 500 (Daily & Weekly)

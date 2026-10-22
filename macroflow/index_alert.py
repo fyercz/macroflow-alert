@@ -103,7 +103,7 @@ def fmt_signals(rows):
     for (tf, bt, side), sigs in sorted(groups.items(), key=lambda g: (g[0][1], g[0][0] == "W")):
         sigs = sorted(sigs, key=lambda s: notify.ORDER.index(s.name))
         s0 = sigs[0]
-        emoji = "🟢" if side == "BUY" else "🔴"
+        emoji = "⭐🟢" if notify.is_a_plus(side, sigs) else ("🟢" if side == "BUY" else "🔴")
         when = (f"Daily {market.tgl(bt)}" if tf == "D"
                 else f"<b>Weekly</b> week ending {market.tgl(bt)}")
         names = " + ".join(notify.short_name(s) for s in sigs) + notify.zone_text(sigs, market.fmt_index)

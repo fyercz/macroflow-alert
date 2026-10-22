@@ -253,7 +253,8 @@ def test_enabled_config():
     assert not any(n == "GOLDEN" for n, _ in d | h), "GOLDEN harus mati"
     assert {n for n, side in h if side == "BUY"} == {"COMBO", "METER", "CHOCH", "OB"}
     assert {"CHOCH", "BOS", "OB", "FVG"} <= {n for n, _ in d}
-    assert ("ROYAL", "SELL") in h and ("ROYAL", "BUY") in d
+    assert ("ROYAL", "SELL") in h and not any(n == "ROYAL" for n, _ in d)
+    assert ("OB", "BUY") not in d and ("FVG", "SELL") not in d and ("OB", "SELL") in d
     assert main.enabled({"signals": {"D": ["COMBO"]}}, "D") == {("COMBO", "BUY"), ("COMBO", "SELL")}
     from macroflow.signals import Signal
     sig = Signal("STANDAR", "BUY", TODAY, 1.0)
@@ -458,6 +459,24 @@ def test_signals_use_heikin_ashi_but_real_prices():
             assert s.info["sl"] < s.close
     p = main.params_from({"params": {"heikin_ashi": "false"}})
     assert p.heikin_ashi is False and main.params_from({}).heikin_ashi is True
+
+
+def test_a_plus_setup():
+    from macroflow.signals import Signal
+    notify.TV_SYMBOLS.clear()
+    info = {"chg": 1.0, "rsi": 60, "vol_ratio": 2.0, "sl": 950, "tp1": 1100, "tp2": 1150}
+    items = [("AAAA", Signal("CHOCH", "BUY", TODAY, 1000.0, dict(info, smc_level="internal"))),
+             ("AAAA", Signal("COMBO", "BUY", TODAY, 1000.0, dict(info))),
+             ("BBBB", Signal("METER", "BUY", TODAY, 500.0, dict(info))),
+             ("CCCC", Signal("CHOCH", "SELL", TODAY, 800.0, {"stop": 820})),
+             ("DDDD", Signal("METER", "SELL", TODAY, 800.0, {"stop": 820}))]
+    msg = "\n".join(notify.build_messages("H", items))
+    assert "⭐ <b>A+ BUY SETUP</b>" in msg and "(1 stocks)" in msg
+    assert msg.index("A+ BUY SETUP") < msg.index("BUY (other)") and msg.count(">AAAA<") == 1
+    assert msg.index(">AAAA<") < msg.index("BUY (other)") < msg.index(">BBBB<")
+    assert notify.is_a_plus("BUY", [items[0][1], items[2][1]]) and not notify.is_a_plus("SELL", [items[0][1]])
+    only = "\n".join(notify.build_messages("H", items[2:3]))
+    assert "A+" not in only.split("<i>")[0] and "(other)" not in only
 
 
 def test_alerts_in_english():

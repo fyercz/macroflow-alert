@@ -41,8 +41,8 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
   1H tiap 10:15, 11:15, 12:15, 14:15, 15:15, 16:15 · Daily SEMENTARA 14:45 · Daily FINAL 16:15
   (+ daftar sinyal sementara yang batal). Cron di `.github/workflows/alert.yml` dalam UTC (WIB−7);
   `main.auto_modes()` menentukan mode dari jam WIB, toleran delay cron GitHub.
-- **Sinyal** (diputuskan 19 Okt 2026 dari backtest Apr–Sep): GOLDEN **mati**. D BUY & SELL: ROYAL, COMBO,
-  STANDAR, METER. 1H BUY: **hanya COMBO + METER**; 1H SELL: ROYAL, COMBO, STANDAR, METER.
+- **Sinyal** (19 Okt 2026, diperbarui 23 Okt): GOLDEN **mati**. D BUY: COMBO, STANDAR, METER, CHOCH, BOS, FVG;
+  D SELL: COMBO, STANDAR, METER, CHOCH, BOS, OB (ROYAL mati di D). 1H BUY: **hanya COMBO + METER**; 1H SELL: ROYAL, COMBO, STANDAR, METER.
   Config `signals.<tf>` = dict `{BUY: [...], SELL: [...]}` atau list (kedua arah); `main.enabled()` → set (nama, arah),
   `main.allowed()` juga menerapkan daftar sinyal indeks.
 - **Alert indeks** (22 Okt 2026, `macroflow/index_alert.py`, config `index_alert`): IHSG (`^JKSE`, TV `IDX:COMPOSITE`)
@@ -117,7 +117,7 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 ## Status terakhir (19 Okt 2026)
 
-- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (27 tes, ±30 detik, jalan tanpa pytest:
+- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (28 tes, ±30 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
 - Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:
@@ -145,8 +145,9 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
   STANDAR −0,04, ROYAL −0,06, OB(breakout) −0,09. Konfluensi SMC+klasik di candle sama +0,07R vs klasik saja −0,07R;
   CHoCH + COMBO/METER ("A+") +0,15R, 1,25/hari, tapi tetap rugi Apr & Sep (rezim pasar tetap dominan).
   SELL benar 5 bar: STANDAR 60%, COMBO/METER 57%, BOS 55%, OB 54%, CHOCH 53%, ROYAL 51%, FVG 47% (terburuk).
-  RSI>70 BUY terbaik lagi. Usulan (menunggu pengguna): matikan ROYAL (BUY & SELL), OB BUY, FVG SELL di Daily
-  (→ 65 sinyal/hari, BUY E ≈ 0), tandai setup A+ di pesan, tambah kolom lapis SMC (internal/swing) di Excel backtest.
+  RSI>70 BUY terbaik lagi. **Diterapkan (pengguna setuju)**: Daily tanpa ROYAL (BUY & SELL), OB BUY, FVG SELL
+  (→ ±65 sinyal/hari); blok "⭐ A+ BUY SETUP" (`notify.is_a_plus`: BUY CHOCH + COMBO/METER candle sama) paling atas
+  di notifikasi saham & ⭐ di alert indeks; kolom Excel backtest "Lapis SMC" & "Zona SMC". 1H tidak diubah.
 
 ## Ide lanjutan yang pernah ditawarkan (belum dikerjakan)
 
