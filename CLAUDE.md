@@ -32,8 +32,8 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
   LuxAlgo): parsed high/low (tukar bila range ≥ 2×ATR200), max 100 tersimpan; **alert OB = breakout/mitigasi High/Low**
   (OB bearish ditembus high → sinyal OB BUY; OB bullish ditembus low → OB SELL). FVG = auto threshold
   (cum|delta%|/bar_index×2). `info["smc_level"]` internal/swing → tampil `🔄CHoCH(swing)`; `info["zone"]` (skala HA).
-  Tidak ada EQH/EQL, Premium/Discount, Strong/Weak High. Aktif: D semua 4, 1H CHOCH & OB, indeks D&W semua 4.
-  **Belum di-backtest & belum dicocokkan dengan chart TradingView asli.** Peringatan keras IHSG tetap COMBO/STANDAR/METER.
+  Tidak ada EQH/EQL, Premium/Discount, Strong/Weak High. Aktif: lihat "Sinyal"; indeks D&W semua 4.
+  Sudah di-backtest Daily (lihat backtest ketiga); **1H belum di-backtest & belum dicocokkan dengan chart TradingView asli.** Peringatan keras IHSG tetap COMBO/STANDAR/METER.
 - **Universe**: semua saham IDX (daftar dari screener TradingView, cache `tickers.txt` 7 hari),
   difilter likuiditas: rata-rata nilai transaksi 20 hari ≥ Rp 2 M, harga ≥ 50.
 - **Tanpa scanner/tabel/fibo** dari Pine — hanya sinyal.
@@ -42,7 +42,7 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
   (+ daftar sinyal sementara yang batal). Cron di `.github/workflows/alert.yml` dalam UTC (WIB−7);
   `main.auto_modes()` menentukan mode dari jam WIB, toleran delay cron GitHub.
 - **Sinyal** (19 Okt 2026, diperbarui 23 Okt): GOLDEN **mati**. D BUY: COMBO, STANDAR, METER, CHOCH, BOS, FVG;
-  D SELL: COMBO, STANDAR, METER, CHOCH, BOS, OB (ROYAL mati di D). 1H BUY: **hanya COMBO + METER**; 1H SELL: ROYAL, COMBO, STANDAR, METER.
+  D SELL: COMBO, STANDAR, METER, CHOCH, BOS, OB (ROYAL mati di D). 1H BUY: COMBO, METER, CHOCH, OB; 1H SELL: ROYAL, COMBO, STANDAR, METER, CHOCH, OB.
   Config `signals.<tf>` = dict `{BUY: [...], SELL: [...]}` atau list (kedua arah); `main.enabled()` → set (nama, arah),
   `main.allowed()` juga menerapkan daftar sinyal indeks.
 - **Alert indeks** (22 Okt 2026, `macroflow/index_alert.py`, config `index_alert`): IHSG (`^JKSE`, TV `IDX:COMPOSITE`)
