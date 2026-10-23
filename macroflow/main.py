@@ -190,7 +190,10 @@ def run_modes(modes, cfg, now, tg, state):
                     continue
                 chart = done
             try:
-                sigs = evaluate(chart, d, h, tf, p, last_n=1 if tf == "D" else 2)
+                # 1H: semua candle hari ini yang sudah close (notifikasi hanya 2x sehari,
+                # sinyal yang sudah terkirim disaring oleh state)
+                n_today = int((chart.index >= today).sum()) if tf == "1H" else 1
+                sigs = evaluate(chart, d, h, tf, p, last_n=max(1, n_today))
             except Exception as e:
                 log.warning("%s gagal dihitung: %s", t, e)
                 continue

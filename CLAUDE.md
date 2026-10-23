@@ -37,9 +37,10 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 - **Universe**: semua saham IDX (daftar dari screener TradingView, cache `tickers.txt` 7 hari),
   difilter likuiditas: rata-rata nilai transaksi 20 hari ≥ Rp 2 M, harga ≥ 50.
 - **Tanpa scanner/tabel/fibo** dari Pine — hanya sinyal.
-- **Timeframe**: Daily + 1H. Jadwal (WIB, Sen–Jum):
-  1H tiap 10:15, 11:15, 12:15, 14:15, 15:15, 16:15 · Daily SEMENTARA 14:45 · Daily FINAL 16:15
-  (+ daftar sinyal sementara yang batal). Cron di `.github/workflows/alert.yml` dalam UTC (WIB−7);
+- **Timeframe**: Daily + 1H. Jadwal (WIB, Sen–Jum) **2x sehari** (pengguna 23 Okt 2026): 14:45 (rangkuman 1H sejak
+  pagi + Daily SEMENTARA) & 16:15 (1H sisa + Daily FINAL + daftar sementara yang batal + alert IHSG). Cron
+  `45 7` & `15 9` UTC + `15 22` (S&P). Mode hourly mengevaluasi **semua candle 1H hari ini yang sudah close**
+  (`last_n` = jumlah bar hari ini), dedup via state → tiap sinyal 1H terkirim sekali. Cron di `.github/workflows/alert.yml` dalam UTC (WIB−7);
   `main.auto_modes()` menentukan mode dari jam WIB, toleran delay cron GitHub.
 - **Sinyal** (19 Okt 2026, diperbarui 23 Okt): GOLDEN **mati**. D BUY: COMBO, STANDAR, METER, CHOCH, BOS, FVG;
   D SELL: COMBO, STANDAR, METER, CHOCH, BOS, OB (ROYAL mati di D). 1H BUY: COMBO, METER, CHOCH, OB; 1H SELL: ROYAL, COMBO, STANDAR, METER, CHOCH, OB.
@@ -117,7 +118,7 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 ## Status terakhir (19 Okt 2026)
 
-- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (28 tes, ±30 detik, jalan tanpa pytest:
+- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (29 tes, ±30 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
 - Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:

@@ -2,11 +2,11 @@ name: MacroFlow Alert
 
 on:
   schedule:
-    # Jam dalam UTC (WIB - 7). Senin-Jumat.
-    # 10:15 11:15 12:15 14:15 15:15 16:15 WIB -> sinyal 1H (16:15 juga Daily FINAL + alert IHSG)
-    - cron: "15 3,4,5,7,8,9 * * 1-5"
-    # 14:45 WIB -> sinyal Daily SEMENTARA (sebelum pre-closing)
+    # Jam dalam UTC (WIB - 7). Notifikasi saham 2x sehari, Senin-Jumat:
+    # 14:45 WIB -> rangkuman sinyal 1H sejak pagi + Daily SEMENTARA (sebelum pre-closing)
     - cron: "45 7 * * 1-5"
+    # 16:15 WIB -> sinyal 1H sisa + Daily FINAL + alert IHSG
+    - cron: "15 9 * * 1-5"
     # 05:15 WIB Selasa-Sabtu -> alert indeks bursa AS (S&P 500) setelah close
     - cron: "15 22 * * 1-5"
   workflow_dispatch:

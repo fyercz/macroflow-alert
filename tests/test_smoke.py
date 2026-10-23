@@ -201,6 +201,28 @@ def test_run_modes_and_dedup():
         assert not any("1H SIGNALS" in m for m in tg2.sent)
 
 
+def test_two_runs_per_day_cover_all_1h_candles():
+    """Jadwal 2x sehari (14:45 & 16:15): semua sinyal 1H hari itu terkirim tepat sekali."""
+    patch_data()
+    notify.TV_SYMBOLS.clear()
+    data.YAHOO_SYMBOLS.clear()
+    with tempfile.TemporaryDirectory() as tmp:
+        state = main.State(Path(tmp) / "state.json")
+        for hh, mm in ((14, 45), (16, 15)):
+            now = datetime(2026, 10, 16, hh, mm, tzinfo=WIB)
+            assert "hourly" in main.auto_modes(now)
+            main.run_modes(["hourly"], CFG, now, FakeTelegram(), state)
+        sent = {k for k in state.d["sent"] if "|1H|" in k}
+    allow = main.enabled(CFG, "1H")
+    expected = set()
+    for t in TICKERS:
+        h = HOURLY[t][HOURLY[t].index + pd.Timedelta(hours=1) <= pd.Timestamp("2026-10-16 16:15")]
+        for sg in evaluate(h, DAILY[t], HOURLY[t], "1H", Params(), last_n=7):
+            if sg.bar_time >= TODAY and (sg.name, sg.side) in allow:
+                expected.add(main.sig_key(t, "1H", sg))
+    assert sent == expected and len(expected) > 0
+
+
 def test_backtest_excel():
     patch_data()
     data.YAHOO_SYMBOLS.clear()

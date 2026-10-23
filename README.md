@@ -73,13 +73,14 @@ Daily saja, + DOWNTREND, BUY + UPTREND, dll., semuanya Daily & Weekly) berapa ka
 sesudahnya dibanding hari biasa, serta seberapa sering sinyal IHSG benar menurut rezim EMA200.
 Data: IHSG harian 10 tahun (Daily & Weekly, Meter SMA50 — sama dengan alert indeks).
 
-## Jadwal (WIB, Senin–Jumat)
+## Jadwal (WIB)
+
+Notifikasi saham **2x sehari**, Senin–Jumat:
 
 | Jam | Isi |
 |---|---|
-| 10:15, 11:15, 12:15, 14:15, 15:15 | Sinyal **1H** dari candle 1 jam yang baru close |
-| 14:45 | Sinyal **Daily SEMENTARA** (candle hari ini belum close, masih sempat masuk di pre-closing) |
-| 16:15 | Sinyal 1H candle terakhir + **Daily FINAL**, termasuk daftar sinyal sementara yang batal, + **alert IHSG** |
+| 14:45 | Rangkuman sinyal **1H** dari semua candle yang sudah close sejak pagi + **Daily SEMENTARA** (candle hari ini belum close, masih sempat masuk di pre-closing) |
+| 16:15 | Sinyal **1H** sisa hari itu + **Daily FINAL** (termasuk sinyal sementara yang batal) + **alert IHSG** |
 | 05:15 (Sel–Sab) | **Alert S&P 500** (bursa AS hari sebelumnya) |
 
 Hari libur bursa terdeteksi otomatis (tidak ada data hari itu, jadi tidak ada notifikasi).
