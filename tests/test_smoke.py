@@ -157,9 +157,15 @@ def test_evaluate_runs():
 def test_auto_modes():
     def at(h, m, day=19):
         return datetime(2026, 10, day, h, m, tzinfo=WIB)
-    assert main.auto_modes(at(10, 15)) == ["hourly"]
-    assert main.auto_modes(at(14, 45)) == ["hourly", "daily-preclose"]
-    assert main.auto_modes(at(16, 15)) == ["hourly", "daily-final", "index-idx"]
+    # default: saham hanya Daily
+    assert main.auto_modes(at(10, 15)) == []
+    assert main.auto_modes(at(14, 45)) == ["daily-preclose"]
+    assert main.auto_modes(at(16, 15)) == ["daily-final", "index-idx"]
+    assert not main.hourly_enabled({}) and main.hourly_enabled({"hourly_alerts": True})
+    # 1H dinyalakan lagi lewat config
+    assert main.auto_modes(at(10, 15), hourly=True) == ["hourly"]
+    assert main.auto_modes(at(14, 45), hourly=True) == ["hourly", "daily-preclose"]
+    assert main.auto_modes(at(16, 15), hourly=True) == ["hourly", "daily-final", "index-idx"]
     assert main.auto_modes(at(18, 0)) == ["daily-final", "index-idx"]
     assert main.auto_modes(at(10, 15, day=18)) == []  # Minggu
     assert main.auto_modes(at(5, 15, day=20)) == ["index-us"]   # Selasa pagi: S&P Senin
@@ -210,7 +216,7 @@ def test_two_runs_per_day_cover_all_1h_candles():
         state = main.State(Path(tmp) / "state.json")
         for hh, mm in ((14, 45), (16, 15)):
             now = datetime(2026, 10, 16, hh, mm, tzinfo=WIB)
-            assert "hourly" in main.auto_modes(now)
+            assert "hourly" in main.auto_modes(now, hourly=True)
             main.run_modes(["hourly"], CFG, now, FakeTelegram(), state)
         sent = {k for k in state.d["sent"] if "|1H|" in k}
     allow = main.enabled(CFG, "1H")
@@ -271,6 +277,7 @@ def test_cmd_backtest_end_tf():
 def test_enabled_config():
     import yaml
     cfg = yaml.safe_load((Path(main.ROOT) / "config.yaml").read_text())
+    assert cfg["hourly_alerts"] is False  # saham hanya Daily (pengguna 23 Okt 2026)
     d, h = main.enabled(cfg, "D"), main.enabled(cfg, "1H")
     assert not any(n == "GOLDEN" for n, _ in d | h), "GOLDEN harus mati"
     assert {n for n, side in h if side == "BUY"} == {"COMBO", "METER", "CHOCH", "OB"}
@@ -499,6 +506,26 @@ def test_a_plus_setup():
     assert notify.is_a_plus("BUY", [items[0][1], items[2][1]]) and not notify.is_a_plus("SELL", [items[0][1]])
     only = "\n".join(notify.build_messages("H", items[2:3]))
     assert "A+" not in only.split("<i>")[0] and "(other)" not in only
+
+
+def test_prepare_short_hourly_when_daily_only():
+    patch_data()
+    calls = []
+    old = data.download
+
+    def dl(tickers, period, interval, **kw):
+        calls.append((interval, period))
+        return fake_download(tickers, period, interval)
+    data.download = dl
+    try:
+        cfg = dict(CFG, signals={"D": ["COMBO", "METER"], "1H": ["COMBO"]})
+        main.prepare(cfg, NOW)
+        assert ("1h", "5d") in calls
+        calls.clear()
+        main.prepare(dict(cfg, hourly_alerts=True), NOW)
+        assert ("1h", "1y") in calls
+    finally:
+        data.download = old
 
 
 def test_alerts_in_english():

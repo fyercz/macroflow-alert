@@ -111,7 +111,11 @@ def prepare(cfg, now):
     if idx:
         daily.update(data.download(idx, cfg.get("daily_period", "3y"), "1d"))
         keep = idx + [t for t in keep if t not in idx]
-    hourly = data.download(keep, cfg.get("hourly_period", "1y"), "1h")
+    # data 1H: histori panjang hanya bila sinyal 1H atau ROYAL (butuh H4) aktif; kalau tidak,
+    # cukup beberapa hari untuk membentuk candle Daily hari ini & cek hari bursa
+    need_long = hourly_enabled(cfg) or any(n == "ROYAL" for n, _ in enabled(cfg, "D"))
+    period = cfg.get("hourly_period", "1y") if need_long else "5d"
+    hourly = data.download(keep, period, "1h")
     return today, keep, daily, hourly
 
 
@@ -267,12 +271,17 @@ STOCK_MODES = ("hourly", "daily-preclose", "daily-final")
 INDEX_MODES = {"index-idx": "IDX", "index-us": "US"}
 
 
-def auto_modes(now):
+def hourly_enabled(cfg):
+    """Sinyal 1H saham aktif? (config `hourly_alerts`, default mati — saham hanya Daily)."""
+    return bool(cfg.get("hourly_alerts", False))
+
+
+def auto_modes(now, hourly=False):
     """Tentukan mode berdasarkan jam WIB (toleran terhadap delay jadwal)."""
     hm = now.hour * 60 + now.minute
     modes = []
     if now.weekday() < 5:  # Senin-Jumat: bursa Indonesia
-        if 10 * 60 <= hm <= 16 * 60 + 59:
+        if hourly and 10 * 60 <= hm <= 16 * 60 + 59:
             modes.append("hourly")
         if 14 * 60 + 30 <= hm < 15 * 60 + 45:
             modes.append("daily-preclose")
@@ -468,7 +477,7 @@ def main():
         return cmd_chat_id()
     if args.cmd == "test-telegram":
         sys.exit(0 if cmd_test_telegram() else 1)
-    modes = auto_modes(now) if args.cmd == "auto" else args.modes
+    modes = auto_modes(now, hourly_enabled(cfg)) if args.cmd == "auto" else args.modes
     if not modes:
         log.info("Di luar jam jadwal (%s WIB) — tidak ada yang dijalankan", f"{now:%a %H:%M}")
         return

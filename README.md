@@ -75,13 +75,16 @@ Data: IHSG harian 10 tahun (Daily & Weekly, Meter SMA50 — sama dengan alert in
 
 ## Jadwal (WIB)
 
-Notifikasi saham **2x sehari**, Senin–Jumat:
+Notifikasi saham **hanya timeframe Daily**, 2x sehari (Senin–Jumat):
 
 | Jam | Isi |
 |---|---|
-| 14:45 | Rangkuman sinyal **1H** dari semua candle yang sudah close sejak pagi + **Daily SEMENTARA** (candle hari ini belum close, masih sempat masuk di pre-closing) |
-| 16:15 | Sinyal **1H** sisa hari itu + **Daily FINAL** (termasuk sinyal sementara yang batal) + **alert IHSG** |
-| 05:15 (Sel–Sab) | **Alert S&P 500** (bursa AS hari sebelumnya) |
+| 14:45 | **Daily SEMENTARA** (candle hari ini belum close, masih sempat masuk di pre-closing) |
+| 16:15 | **Daily FINAL** (termasuk sinyal sementara yang batal) + **alert IHSG** (Daily & Weekly) |
+| 05:15 (Sel–Sab) | **Alert S&P 500** (Daily & Weekly, bursa AS hari sebelumnya) |
+
+Sinyal 1H saham dimatikan (`hourly_alerts: false` di `config.yaml`). Ubah ke `true` untuk menyalakannya lagi —
+sinyal 1H lalu ikut dikirim di jadwal 14:45 & 16:15.
 
 Hari libur bursa terdeteksi otomatis (tidak ada data hari itu, jadi tidak ada notifikasi).
 Jadwal GitHub kadang telat 5–15 menit, dan itu masih aman karena datanya memang delay.

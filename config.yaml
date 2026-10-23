@@ -27,6 +27,10 @@ filter:
   min_avg_value: 2000000000   # rata-rata nilai transaksi 20 hari (Rp). 2 M = 2 miliar
   min_price: 50               # harga minimum (Rp)
 
+# Notifikasi saham hanya timeframe DAILY (14:45 sementara & 16:15 final).
+# Ubah ke true untuk menyalakan lagi sinyal 1H (dikirim di jadwal yang sama).
+hourly_alerts: false
+
 # Sinyal yang dikirim per timeframe & arah (hapus yang tidak perlu).
 # Pilihan: ROYAL, COMBO, GOLDEN (khusus BUY), STANDAR, METER,
 #          SMC (port LuxAlgo): CHOCH (pembalikan struktur), BOS (lanjutan struktur),

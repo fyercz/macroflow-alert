@@ -37,8 +37,11 @@ beri langkah klik-per-klik di GitHub/Telegram, jangan suruh pakai terminal kecua
 - **Universe**: semua saham IDX (daftar dari screener TradingView, cache `tickers.txt` 7 hari),
   difilter likuiditas: rata-rata nilai transaksi 20 hari ≥ Rp 2 M, harga ≥ 50.
 - **Tanpa scanner/tabel/fibo** dari Pine — hanya sinyal.
-- **Timeframe**: Daily + 1H. Jadwal (WIB, Sen–Jum) **2x sehari** (pengguna 23 Okt 2026): 14:45 (rangkuman 1H sejak
-  pagi + Daily SEMENTARA) & 16:15 (1H sisa + Daily FINAL + daftar sementara yang batal + alert IHSG). Cron
+- **Timeframe saham: DAILY SAJA** (pengguna 23 Okt 2026). `hourly_alerts: false` → `auto_modes(now, hourly=False)`
+  tidak memasukkan mode hourly; `prepare()` hanya unduh 1H "5d" (untuk candle hari ini & cek hari bursa) kecuali
+  1H/ROYAL-D aktif. Alert indeks tetap Daily + Weekly. Default tf backtest di menu workflow = D.
+  Jadwal (WIB, Sen–Jum) **2x sehari**: 14:45 (Daily SEMENTARA; + rangkuman 1H sejak pagi bila 1H dinyalakan) &
+  16:15 (Daily FINAL + daftar sementara yang batal + alert IHSG). Cron
   `45 7` & `15 9` UTC + `15 22` (S&P). Mode hourly mengevaluasi **semua candle 1H hari ini yang sudah close**
   (`last_n` = jumlah bar hari ini), dedup via state → tiap sinyal 1H terkirim sekali. Cron di `.github/workflows/alert.yml` dalam UTC (WIB−7);
   `main.auto_modes()` menentukan mode dari jam WIB, toleran delay cron GitHub.
@@ -118,7 +121,7 @@ State antar-run (`state.json`: dedup sinyal, preclose, done-flag) & `tickers.txt
 
 ## Status terakhir (19 Okt 2026)
 
-- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (29 tes, ±30 detik, jalan tanpa pytest:
+- `tests/test_smoke.py` & `CLAUDE.md` ditambahkan ke repo (30 tes, ±30 detik, jalan tanpa pytest:
   `python tests/test_smoke.py`). Tes tidak dijalankan di GitHub Actions (hanya lokal).
 - Repo terpasang, secret terisi, `test-telegram` **berhasil**. Jadwal otomatis mulai Senin 19 Okt 2026.
 - Backtest pertama (data asli, 14–16 Okt 2026, 314 saham) sudah dianalisis — **tidak representatif**:

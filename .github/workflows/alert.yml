@@ -25,7 +25,7 @@ on:
       tf:
         description: "Backtest: timeframe (D saja jauh lebih cepat)"
         type: choice
-        default: "D dan 1H"
+        default: "D"
         options: ["D dan 1H", "D", "1H"]
 
 concurrency:
